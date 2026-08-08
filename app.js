@@ -234,7 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Reset button for testing
     resetBtn.addEventListener('click', () => {
-        if(confirm('Are you sure you want to reset today\\'s progress?')) {
+        if(confirm("Are you sure you want to reset today's progress?")) {
             state.score = 0;
             state.tasks.forEach(t => {
                 t.completed = false;
