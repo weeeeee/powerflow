@@ -107,7 +107,7 @@ body {
     z-index: 1;
 }
 
-#total-score {
+#total-score, #store-total-score {
     font-size: 3.5rem;
     font-weight: 700;
     z-index: 2;
