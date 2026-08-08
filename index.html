@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerFlow | Daily Routine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="background-animation"></div>
+    
+    <main class="app-container glass-panel">
+        <header class="app-header">
+            <h1>PowerFlow</h1>
+            <p class="subtitle">Master your day, one habit at a time.</p>
+        </header>
+
+        <section class="score-section">
+            <div class="score-circle">
+                <span id="total-score">0</span>
+                <span class="score-label">Points</span>
+            </div>
+            <div class="date-display" id="current-date">Today</div>
+        </section>
+
+        <section class="schedule-section">
+            <h2>Your Schedule</h2>
+            <div id="task-list" class="task-list">
+                <!-- Tasks will be injected here by JS -->
+            </div>
+        </section>
+
+        <!-- A hidden modal or form to simulate "completion time" for testing purposes -->
+        <div class="test-controls">
+            <h3>Test Controls</h3>
+            <label for="simulate-time">Simulate Current Time:</label>
+            <input type="time" id="simulate-time" value="08:00">
+            <button id="reset-btn" class="btn-secondary">Reset Day</button>
+        </div>
+        
+        <footer class="app-footer">
+            <div class="current-time-display">
+                Current Time: <span id="live-time">--:--:--</span>
+            </div>
+        </footer>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>
