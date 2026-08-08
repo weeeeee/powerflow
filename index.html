@@ -25,7 +25,17 @@
             <section class="score-section">
                 <div class="score-circle">
                     <span id="total-score">0</span>
-                    <span class="score-label">Points</span>
+                    <span class="score-label">Today</span>
+                </div>
+                <div class="long-term-stats">
+                    <div class="lt-stat">
+                        <span class="lt-label">This Week</span>
+                        <span class="lt-value" id="weekly-score-display">0</span>
+                    </div>
+                    <div class="lt-stat">
+                        <span class="lt-label">All Time</span>
+                        <span class="lt-value" id="alltime-score-display">0</span>
+                    </div>
                 </div>
                 <div class="date-display" id="current-date">Today</div>
             </section>
@@ -76,7 +86,15 @@
             <div class="portal-stats-grid">
                 <div class="stat-card">
                     <span class="stat-value" id="parent-total-score">0</span>
-                    <span class="stat-label">Total Score</span>
+                    <span class="stat-label">Today</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="parent-weekly-score">0</span>
+                    <span class="stat-label">This Week</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="parent-alltime-score">0</span>
+                    <span class="stat-label">All Time</span>
                 </div>
                 <div class="stat-card">
                     <span class="stat-value" id="parent-event-count">0</span>

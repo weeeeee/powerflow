@@ -56,6 +56,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Application State
     let state = {
         score: 0,
+        weeklyScore: 0,
+        allTimeScore: 0,
         parentPassword: '1234',
         isParentUnlocked: false,
         lastResetDate: new Date().toDateString(),
@@ -152,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
                 if (!Array.isArray(state.adjustments)) state.adjustments = [];
                 if (!state.parentPassword) state.parentPassword = '1234';
+                if (typeof state.weeklyScore !== 'number') state.weeklyScore = 0;
+                if (typeof state.allTimeScore !== 'number') state.allTimeScore = 0;
             } catch (e) {
                 console.error("Failed to parse saved state:", e);
             }
@@ -164,6 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function saveState() {
         const stateToSave = {
             score: state.score,
+            weeklyScore: state.weeklyScore,
+            allTimeScore: state.allTimeScore,
             parentPassword: state.parentPassword,
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
@@ -203,11 +209,43 @@ document.addEventListener('DOMContentLoaded', () => {
         state.score = Math.max(0, taskScore + questScore + adjScore);
     }
 
+    // Helper to check if two dates are in different weeks (using Monday as start of week)
+    function isDifferentWeek(date1, date2) {
+        const d1 = new Date(date1);
+        const d2 = new Date(date2);
+        
+        // Normalize to midnight
+        d1.setHours(0,0,0,0);
+        d2.setHours(0,0,0,0);
+        
+        const day1 = d1.getDay() === 0 ? 6 : d1.getDay() - 1;
+        const monday1 = new Date(d1);
+        monday1.setDate(d1.getDate() - day1);
+        
+        const day2 = d2.getDay() === 0 ? 6 : d2.getDay() - 1;
+        const monday2 = new Date(d2);
+        monday2.setDate(d2.getDate() - day2);
+        
+        return monday1.getTime() !== monday2.getTime();
+    }
+
     // Reset daily tasks & side quests if a new day has started
     function checkDailyReset() {
-        const today = new Date().toDateString();
-        if (state.lastResetDate !== today) {
-            state.lastResetDate = today;
+        const todayStr = new Date().toDateString();
+        if (state.lastResetDate !== todayStr) {
+            const previousScore = state.score || 0;
+            
+            // Add previous day's score to all-time
+            state.allTimeScore = (state.allTimeScore || 0) + previousScore;
+            
+            // Check for new week
+            if (isDifferentWeek(state.lastResetDate, todayStr)) {
+                state.weeklyScore = 0; // Fresh week, it doesn't include yesterday
+            } else {
+                state.weeklyScore = (state.weeklyScore || 0) + previousScore;
+            }
+
+            state.lastResetDate = todayStr;
             state.tasks.forEach(t => {
                 t.completed = false;
                 t.pointsEarned = 0;
@@ -219,8 +257,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     q.completedAt = null;
                 });
             }
+            state.adjustments = []; // Clear daily adjustments
+            
             recalculateTotalScore();
             saveState();
+
+            if (typeof updateScoreDisplays === 'function') {
+                updateScoreDisplays();
+            }
         }
     }
 
@@ -234,6 +278,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const ampm = h >= 12 ? 'PM' : 'AM';
             h = h % 12 || 12;
             liveTimeEl.textContent = `${h}:${m}:${s} ${ampm}`;
+
+            // Check for midnight crossing while app is open
+            if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+                checkDailyReset();
+                renderScheduleTasks();
+                renderSideQuests();
+                renderParentPortal();
+            }
         };
         updateClock();
         setInterval(updateClock, 1000);
@@ -589,6 +641,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalScoreEl.style.transform = 'scale(1)';
             }, 200);
         }
+
+        // Update long-term displays
+        const weeklyTotal = (state.weeklyScore || 0) + state.score;
+        const allTimeTotal = (state.allTimeScore || 0) + state.score;
+
+        const weeklyDisplayEl = document.getElementById('weekly-score-display');
+        const alltimeDisplayEl = document.getElementById('alltime-score-display');
+        const parentWeeklyEl = document.getElementById('parent-weekly-score');
+        const parentAlltimeEl = document.getElementById('parent-alltime-score');
+
+        if (weeklyDisplayEl) weeklyDisplayEl.textContent = weeklyTotal;
+        if (alltimeDisplayEl) alltimeDisplayEl.textContent = allTimeTotal;
+        if (parentWeeklyEl) parentWeeklyEl.textContent = weeklyTotal;
+        if (parentAlltimeEl) parentAlltimeEl.textContent = allTimeTotal;
     }
 
     // View Navigation Logic
