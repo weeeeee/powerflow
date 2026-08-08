@@ -846,4 +846,138 @@ body {
     margin-left: 0.5rem;
 }
 
+/* Side Quests Section Styles */
+.sidequest-section {
+    margin-top: 2rem;
+}
+
+.badge-quest {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(236, 72, 153, 0.2)) !important;
+    color: #f59e0b !important;
+    border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.quest-card {
+    background: rgba(245, 158, 11, 0.04);
+    border: 1px solid rgba(245, 158, 11, 0.25);
+    position: relative;
+    overflow: hidden;
+}
+
+.quest-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #f59e0b, #ec4899);
+}
+
+.quest-card:hover {
+    background: rgba(245, 158, 11, 0.09);
+    border-color: rgba(245, 158, 11, 0.45);
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.15);
+}
+
+.quest-card.completed {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.05);
+}
+
+.quest-card.completed::before {
+    background: #10b981;
+}
+
+.quest-points-badge {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #ffffff;
+    padding: 3px 9px;
+    border-radius: 12px;
+    font-weight: 700;
+    font-size: 0.75rem;
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+    letter-spacing: 0.3px;
+}
+
+.btn-quest {
+    background: linear-gradient(135deg, #f59e0b, #ec4899);
+    color: white;
+    border: none;
+    padding: 0.8rem 1rem;
+    border-radius: 12px;
+    font-family: inherit;
+    font-weight: 600;
+    font-size: 0.88rem;
+    cursor: pointer;
+    flex: 1;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 15px rgba(245, 158, 11, 0.25);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.btn-quest:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.45);
+}
+
+.quest-parent-card {
+    border-color: rgba(245, 158, 11, 0.2);
+}
+
+/* Preset Chips for Quick Add */
+.preset-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.4rem;
+}
+
+.preset-chip {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.preset-chip:hover {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(245, 158, 11, 0.5);
+    color: #ffffff;
+    transform: translateY(-1px);
+}
+
+.custom-select {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 0.75rem 1rem;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.95rem;
+    width: 100%;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.custom-select option {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+.custom-select:focus {
+    border-color: #f59e0b;
+}
+
+
 

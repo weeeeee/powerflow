@@ -40,6 +40,17 @@
                 </div>
             </section>
 
+            <!-- Side Quests Section -->
+            <section class="schedule-section sidequest-section">
+                <div class="section-header">
+                    <h2>⚔️ Daily Side Quests</h2>
+                    <span class="task-count-badge badge-quest" id="kid-quest-badge">0 Bonus Quests</span>
+                </div>
+                <div id="sidequest-list" class="task-list sidequest-list">
+                    <!-- Side Quests will be injected here by JS -->
+                </div>
+            </section>
+
             <!-- Test controls to simulate completion time -->
             <div class="test-controls">
                 <h3>Test Controls</h3>
@@ -72,6 +83,10 @@
                     <span class="stat-label">Events</span>
                 </div>
                 <div class="stat-card">
+                    <span class="stat-value" id="parent-quest-count">0</span>
+                    <span class="stat-label">Side Quests</span>
+                </div>
+                <div class="stat-card">
                     <span class="stat-value" id="parent-adj-count">0</span>
                     <span class="stat-label">Adjustments</span>
                 </div>
@@ -79,8 +94,9 @@
 
             <!-- Management Buttons -->
             <div class="management-controls">
-                <button id="open-add-event-btn" class="btn-primary">+ Add New Event</button>
-                <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points (+ / -)</button>
+                <button id="open-add-event-btn" class="btn-primary">+ Add Event</button>
+                <button id="open-add-quest-btn" class="btn-quest">⚔️ + Side Quest</button>
+                <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points</button>
             </div>
 
             <!-- Schedule Management Section -->
@@ -91,6 +107,17 @@
                 </div>
                 <div id="parent-event-list" class="parent-event-list">
                     <!-- Parent event management items injected here -->
+                </div>
+            </section>
+
+            <!-- Side Quests Management Section -->
+            <section class="portal-section">
+                <div class="section-header">
+                    <h3>Manage Daily Side Quests</h3>
+                    <span class="sub-text">Bonus tasks for extra daily points</span>
+                </div>
+                <div id="parent-quest-list" class="parent-event-list">
+                    <!-- Parent side quest items injected here -->
                 </div>
             </section>
 
@@ -175,6 +202,60 @@
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" id="cancel-event-btn">Cancel</button>
                     <button type="submit" class="btn-primary" id="save-event-btn">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Side Quest -->
+    <div id="sidequest-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3 id="quest-modal-title">Add New Daily Side Quest</h3>
+                <button class="close-modal-btn" id="close-quest-modal">&times;</button>
+            </div>
+            <form id="quest-form" class="modal-body">
+                <input type="hidden" id="quest-edit-id">
+                
+                <div class="input-group">
+                    <label for="quest-title-input">Side Quest Title:</label>
+                    <input type="text" id="quest-title-input" placeholder="e.g. Clean up toys, Read extra chapter" required>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="quest-points-input">Bonus Points:</label>
+                        <input type="number" id="quest-points-input" min="1" max="500" value="10" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="quest-category-select">Category:</label>
+                        <select id="quest-category-select" class="custom-select">
+                            <option value="Chores">🧹 Chores</option>
+                            <option value="Learning">📚 Learning</option>
+                            <option value="Kindness">💖 Kindness</option>
+                            <option value="Health">🍎 Health</option>
+                            <option value="Custom">🎯 Custom</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Quick Presets -->
+                <div class="input-group">
+                    <label>Quick Presets (Click to Fill):</label>
+                    <div class="preset-chips">
+                        <button type="button" class="preset-chip" data-title="Clean Bedroom Toys" data-points="10" data-cat="Chores">🧹 Clean Bedroom (+10)</button>
+                        <button type="button" class="preset-chip" data-title="Read 15 Mins" data-points="15" data-cat="Learning">📚 Read 15 Mins (+15)</button>
+                        <button type="button" class="preset-chip" data-title="Help Set Dinner Table" data-points="10" data-cat="Chores">🍽️ Set Table (+10)</button>
+                        <button type="button" class="preset-chip" data-title="Feed the Pet" data-points="10" data-cat="Chores">🐶 Feed Pet (+10)</button>
+                        <button type="button" class="preset-chip" data-title="Extra Math Practice" data-points="20" data-cat="Learning">🔢 Math Practice (+20)</button>
+                        <button type="button" class="preset-chip" data-title="Water Garden Plants" data-points="10" data-cat="Chores">🪴 Water Plants (+10)</button>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-quest-btn">Cancel</button>
+                    <button type="submit" class="btn-quest" id="save-quest-btn" style="flex:1;">Save Side Quest</button>
                 </div>
             </form>
         </div>

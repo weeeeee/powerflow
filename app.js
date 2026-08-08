@@ -33,6 +33,26 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
 
+    // Default initial side quests
+    const defaultSideQuests = [
+        {
+            id: 'sq-1',
+            title: 'Organize Bedroom Toys',
+            points: 10,
+            category: 'Chores',
+            completed: false,
+            completedAt: null
+        },
+        {
+            id: 'sq-2',
+            title: 'Read Extra 15 Mins',
+            points: 15,
+            category: 'Learning',
+            completed: false,
+            completedAt: null
+        }
+    ];
+
     // Application State
     let state = {
         score: 0,
@@ -40,6 +60,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isParentUnlocked: false,
         lastResetDate: new Date().toDateString(),
         tasks: defaultTasks,
+        sideQuests: defaultSideQuests,
         adjustments: [] // Log of manual points adjustments: { id, type, amount, reason, timestamp }
     };
 
@@ -112,6 +133,7 @@ document.addEventListener('DOMContentLoaded', () => {
         recalculateTotalScore();
         renderDate();
         renderScheduleTasks();
+        renderSideQuests();
         renderParentPortal();
         updateScoreDisplays();
         startLiveClock();
@@ -127,6 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state = { ...state, ...parsed };
                 // Ensure arrays exist
                 if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
+                if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
                 if (!Array.isArray(state.adjustments)) state.adjustments = [];
                 if (!state.parentPassword) state.parentPassword = '1234';
             } catch (e) {
@@ -144,12 +167,13 @@ document.addEventListener('DOMContentLoaded', () => {
             parentPassword: state.parentPassword,
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
+            sideQuests: state.sideQuests,
             adjustments: state.adjustments
         };
         localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
     }
 
-    // Recalculate score from task earnings + manual adjustments
+    // Recalculate score from task earnings + side quests + manual adjustments
     function recalculateTotalScore() {
         let taskScore = 0;
         state.tasks.forEach(t => {
@@ -157,6 +181,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 taskScore += (t.pointsEarned !== undefined ? t.pointsEarned : t.basePoints);
             }
         });
+
+        let questScore = 0;
+        if (Array.isArray(state.sideQuests)) {
+            state.sideQuests.forEach(q => {
+                if (q.completed) {
+                    questScore += (q.points || 0);
+                }
+            });
+        }
 
         let adjScore = 0;
         state.adjustments.forEach(adj => {
@@ -167,10 +200,10 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        state.score = Math.max(0, taskScore + adjScore);
+        state.score = Math.max(0, taskScore + questScore + adjScore);
     }
 
-    // Reset daily tasks if a new day has started
+    // Reset daily tasks & side quests if a new day has started
     function checkDailyReset() {
         const today = new Date().toDateString();
         if (state.lastResetDate !== today) {
@@ -180,6 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 t.pointsEarned = 0;
                 t.completedAt = null;
             });
+            if (Array.isArray(state.sideQuests)) {
+                state.sideQuests.forEach(q => {
+                    q.completed = false;
+                    q.completedAt = null;
+                });
+            }
             recalculateTotalScore();
             saveState();
         }
@@ -314,14 +353,138 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // Render Parent Portal Views (Events list + Audit log + Stats)
+    // Helper icon getter for categories
+    function getCategoryIcon(cat) {
+        switch (cat) {
+            case 'Chores': return '🧹';
+            case 'Learning': return '📚';
+            case 'Kindness': return '💖';
+            case 'Health': return '🍎';
+            default: return '🎯';
+        }
+    }
+
+    // Toggle Side Quest Completion
+    function toggleSideQuest(questId) {
+        const quest = (state.sideQuests || []).find(q => q.id === questId);
+        if (!quest) return;
+
+        if (!quest.completed) {
+            const timeVal = simulateTimeInput ? simulateTimeInput.value : '';
+            let completedTimeStr = timeVal;
+            if (!completedTimeStr) {
+                const now = new Date();
+                completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            }
+            quest.completed = true;
+            quest.completedAt = completedTimeStr;
+        } else {
+            quest.completed = false;
+            quest.completedAt = null;
+        }
+
+        recalculateTotalScore();
+        saveState();
+        renderSideQuests();
+        renderParentPortal();
+        updateScoreDisplays();
+    }
+
+    // Render Kid View Side Quests
+    function renderSideQuests() {
+        const sideQuestListEl = document.getElementById('sidequest-list');
+        const kidQuestBadgeEl = document.getElementById('kid-quest-badge');
+
+        if (!sideQuestListEl || !kidQuestBadgeEl) return;
+
+        sideQuestListEl.innerHTML = '';
+        const quests = state.sideQuests || [];
+        kidQuestBadgeEl.textContent = `${quests.length} Bonus Quest${quests.length !== 1 ? 's' : ''}`;
+
+        if (quests.length === 0) {
+            sideQuestListEl.innerHTML = `<div class="empty-state">No daily side quests active today. Ask a parent to assign bonus quests!</div>`;
+            return;
+        }
+
+        quests.forEach(quest => {
+            const card = document.createElement('div');
+            card.className = `task-card quest-card ${quest.completed ? 'completed' : ''}`;
+
+            const icon = getCategoryIcon(quest.category);
+
+            card.innerHTML = `
+                <div class="task-info">
+                    <div class="task-title">${icon} ${quest.title}</div>
+                    <div class="task-meta">
+                        <span class="quest-points-badge">+${quest.points} Bonus Pts</span>
+                        <span class="event-tag">${quest.category || 'Custom'}</span>
+                        ${quest.completed && quest.completedAt ? `<span>(Done: ${formatTime(quest.completedAt)})</span>` : ''}
+                    </div>
+                </div>
+                <button class="complete-btn quest-complete-btn" aria-label="${quest.completed ? 'Uncomplete' : 'Complete'} side quest"></button>
+            `;
+
+            card.querySelector('.complete-btn').addEventListener('click', () => toggleSideQuest(quest.id));
+            sideQuestListEl.appendChild(card);
+        });
+    }
+
+    // Render Parent Portal Views (Events list + Side Quests list + Audit log + Stats)
     function renderParentPortal() {
         parentTotalScoreEl.textContent = state.score;
         parentEventCountEl.textContent = state.tasks.length;
+        
+        const parentQuestCountEl = document.getElementById('parent-quest-count');
+        if (parentQuestCountEl) {
+            parentQuestCountEl.textContent = (state.sideQuests || []).length;
+        }
+
         parentAdjCountEl.textContent = state.adjustments.length;
 
         renderParentEventList();
+        renderParentQuestList();
         renderPointsAuditLog();
+    }
+
+    // Render Parent Side Quests Management List
+    function renderParentQuestList() {
+        const parentQuestListEl = document.getElementById('parent-quest-list');
+        if (!parentQuestListEl) return;
+
+        parentQuestListEl.innerHTML = '';
+        const quests = state.sideQuests || [];
+
+        if (quests.length === 0) {
+            parentQuestListEl.innerHTML = `<div class="empty-state">No daily side quests created. Click "⚔️ + Side Quest" to add one!</div>`;
+            return;
+        }
+
+        quests.forEach(quest => {
+            const card = document.createElement('div');
+            card.className = 'parent-event-card quest-parent-card';
+
+            const icon = getCategoryIcon(quest.category);
+
+            card.innerHTML = `
+                <div class="parent-event-info">
+                    <div class="parent-event-title">${icon} ${quest.title}</div>
+                    <div class="parent-event-meta">
+                        <span class="quest-points-badge">+${quest.points} pts</span>
+                        <span class="event-tag">${quest.category || 'Custom'}</span>
+                        ${quest.completed ? '<span class="badge badge-success">Completed Today</span>' : ''}
+                    </div>
+                </div>
+                <div class="parent-event-actions">
+                    <button class="btn-icon edit-quest-btn" title="Edit Side Quest">✏️</button>
+                    <button class="btn-danger subtract-quest-btn" title="Delete Side Quest">➖ Delete</button>
+                </div>
+            `;
+
+            card.querySelector('.edit-quest-btn').addEventListener('click', () => openEditQuestModal(quest));
+            card.querySelector('.subtract-quest-btn').addEventListener('click', () => deleteQuest(quest.id));
+
+            parentQuestListEl.appendChild(card);
+        });
     }
 
     // Render Parent Schedule Management List (With Add / Subtract controls)
@@ -471,57 +634,62 @@ document.addEventListener('DOMContentLoaded', () => {
         switchToScheduleView();
     }
 
-    // Event Modal Functions (Add & Edit)
-    function openAddEventModal() {
-        eventModalTitle.textContent = 'Add New Scheduled Event';
-        eventEditIdInput.value = '';
-        eventTitleInput.value = '';
-        eventPointsInput.value = '5';
-        eventTimeInput.value = '';
-        eventPenaltyInput.value = '1';
-        eventModal.classList.remove('hidden');
-        setTimeout(() => eventTitleInput.focus(), 100);
+    // Side Quest Modal Functions (Add & Edit)
+    function openAddQuestModal() {
+        const questModalTitle = document.getElementById('quest-modal-title');
+        const questEditIdInput = document.getElementById('quest-edit-id');
+        const questTitleInput = document.getElementById('quest-title-input');
+        const questPointsInput = document.getElementById('quest-points-input');
+        const questCategorySelect = document.getElementById('quest-category-select');
+        const sideQuestModal = document.getElementById('sidequest-modal');
+
+        if (!sideQuestModal) return;
+
+        questModalTitle.textContent = 'Add New Daily Side Quest';
+        questEditIdInput.value = '';
+        questTitleInput.value = '';
+        questPointsInput.value = '10';
+        questCategorySelect.value = 'Chores';
+        sideQuestModal.classList.remove('hidden');
+        setTimeout(() => questTitleInput.focus(), 100);
     }
 
-    function openEditEventModal(task) {
-        eventModalTitle.textContent = 'Edit Scheduled Event';
-        eventEditIdInput.value = task.id;
-        eventTitleInput.value = task.title;
-        eventPointsInput.value = task.basePoints;
-        eventTimeInput.value = task.targetTime || '';
-        eventPenaltyInput.value = task.penaltyPerHour || 0;
-        eventModal.classList.remove('hidden');
-        setTimeout(() => eventTitleInput.focus(), 100);
+    function openEditQuestModal(quest) {
+        const questModalTitle = document.getElementById('quest-modal-title');
+        const questEditIdInput = document.getElementById('quest-edit-id');
+        const questTitleInput = document.getElementById('quest-title-input');
+        const questPointsInput = document.getElementById('quest-points-input');
+        const questCategorySelect = document.getElementById('quest-category-select');
+        const sideQuestModal = document.getElementById('sidequest-modal');
+
+        if (!sideQuestModal) return;
+
+        questModalTitle.textContent = 'Edit Daily Side Quest';
+        questEditIdInput.value = quest.id;
+        questTitleInput.value = quest.title;
+        questPointsInput.value = quest.points;
+        questCategorySelect.value = quest.category || 'Chores';
+        sideQuestModal.classList.remove('hidden');
+        setTimeout(() => questTitleInput.focus(), 100);
     }
 
-    function closeEventModal() {
-        eventModal.classList.add('hidden');
+    function closeQuestModal() {
+        const sideQuestModal = document.getElementById('sidequest-modal');
+        if (sideQuestModal) sideQuestModal.classList.add('hidden');
     }
 
-    // Points Modal Functions
-    function openPointsModal() {
-        pointsAmountInput.value = '5';
-        pointsReasonInput.value = '';
-        pointsModal.classList.remove('hidden');
-        setTimeout(() => pointsAmountInput.focus(), 100);
-    }
+    function deleteQuest(questId) {
+        const quest = (state.sideQuests || []).find(q => q.id === questId);
+        if (!quest) return;
 
-    function closePointsModal() {
-        pointsModal.classList.add('hidden');
-    }
-
-    // Change Password Modal Functions
-    function openChangePassModal() {
-        currentPassInput.value = '';
-        newPassInput.value = '';
-        confirmPassInput.value = '';
-        passChangeError.classList.add('hidden');
-        changePassModal.classList.remove('hidden');
-        setTimeout(() => currentPassInput.focus(), 100);
-    }
-
-    function closeChangePassModal() {
-        changePassModal.classList.add('hidden');
+        if (confirm(`Are you sure you want to delete side quest "${quest.title}"?`)) {
+            state.sideQuests = state.sideQuests.filter(q => q.id !== questId);
+            recalculateTotalScore();
+            saveState();
+            renderSideQuests();
+            renderParentPortal();
+            updateScoreDisplays();
+        }
     }
 
     // Setup Event Listeners
@@ -557,6 +725,12 @@ document.addEventListener('DOMContentLoaded', () => {
         lockPortalBtn.addEventListener('click', lockParentPortal);
         changePassBtn.addEventListener('click', openChangePassModal);
         openAddEventBtn.addEventListener('click', openAddEventModal);
+        
+        const openAddQuestBtn = document.getElementById('open-add-quest-btn');
+        if (openAddQuestBtn) {
+            openAddQuestBtn.addEventListener('click', openAddQuestModal);
+        }
+
         openAdjustPointsBtn.addEventListener('click', openPointsModal);
 
         // Event Modal Submit (Save Event)
@@ -604,6 +778,71 @@ document.addEventListener('DOMContentLoaded', () => {
 
         closeEventModalBtn.addEventListener('click', closeEventModal);
         cancelEventBtn.addEventListener('click', closeEventModal);
+
+        // Side Quest Modal Handlers
+        const closeQuestModalBtn = document.getElementById('close-quest-modal');
+        const cancelQuestBtn = document.getElementById('cancel-quest-btn');
+        const questForm = document.getElementById('quest-form');
+
+        if (closeQuestModalBtn) closeQuestModalBtn.addEventListener('click', closeQuestModal);
+        if (cancelQuestBtn) cancelQuestBtn.addEventListener('click', closeQuestModal);
+
+        if (questForm) {
+            questForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const editId = document.getElementById('quest-edit-id').value;
+                const title = document.getElementById('quest-title-input').value.trim();
+                const points = parseInt(document.getElementById('quest-points-input').value, 10) || 10;
+                const category = document.getElementById('quest-category-select').value;
+
+                if (!title) return;
+
+                if (!Array.isArray(state.sideQuests)) state.sideQuests = [];
+
+                if (editId) {
+                    const quest = state.sideQuests.find(q => q.id === editId);
+                    if (quest) {
+                        quest.title = title;
+                        quest.points = points;
+                        quest.category = category;
+                    }
+                } else {
+                    const newQuest = {
+                        id: `sq-${Date.now()}`,
+                        title,
+                        points,
+                        category,
+                        completed: false,
+                        completedAt: null
+                    };
+                    state.sideQuests.push(newQuest);
+                }
+
+                recalculateTotalScore();
+                saveState();
+                renderSideQuests();
+                renderParentPortal();
+                updateScoreDisplays();
+                closeQuestModal();
+            });
+        }
+
+        // Quick Preset Chip Listeners
+        document.querySelectorAll('.preset-chip').forEach(chip => {
+            chip.addEventListener('click', () => {
+                const title = chip.getAttribute('data-title');
+                const pts = chip.getAttribute('data-points');
+                const cat = chip.getAttribute('data-cat');
+                
+                const titleInput = document.getElementById('quest-title-input');
+                const pointsInput = document.getElementById('quest-points-input');
+                const categorySelect = document.getElementById('quest-category-select');
+
+                if (titleInput && title) titleInput.value = title;
+                if (pointsInput && pts) pointsInput.value = pts;
+                if (categorySelect && cat) categorySelect.value = cat;
+            });
+        });
 
         // Points Form Submit (Apply Manual Adjustment)
         pointsForm.addEventListener('submit', (e) => {
@@ -677,9 +916,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     t.pointsEarned = 0;
                     t.completedAt = null;
                 });
+                if (Array.isArray(state.sideQuests)) {
+                    state.sideQuests.forEach(q => {
+                        q.completed = false;
+                        q.completedAt = null;
+                    });
+                }
                 recalculateTotalScore();
                 saveState();
                 renderScheduleTasks();
+                renderSideQuests();
                 renderParentPortal();
                 updateScoreDisplays();
             }
