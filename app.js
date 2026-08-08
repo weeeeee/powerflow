@@ -1,61 +1,191 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Default initial tasks if none exist in localStorage
+    const defaultTasks = [
+        {
+            id: 'task-1',
+            title: 'Wake up at 8 AM',
+            basePoints: 5,
+            targetTime: '08:00',
+            penaltyPerHour: 1,
+            completed: false,
+            pointsEarned: 0,
+            completedAt: null
+        },
+        {
+            id: 'task-2',
+            title: 'Brush teeth',
+            basePoints: 5,
+            targetTime: null,
+            penaltyPerHour: 0,
+            completed: false,
+            pointsEarned: 0,
+            completedAt: null
+        },
+        {
+            id: 'task-3',
+            title: 'Breakfast',
+            basePoints: 5,
+            targetTime: null,
+            penaltyPerHour: 0,
+            completed: false,
+            pointsEarned: 0,
+            completedAt: null
+        }
+    ];
+
     // Application State
     let state = {
         score: 0,
+        parentPassword: '1234',
+        isParentUnlocked: false,
         lastResetDate: new Date().toDateString(),
-        tasks: [
-            {
-                id: 'task-1',
-                title: 'Wake up at 8 AM',
-                basePoints: 5,
-                targetTime: '08:00', // 24-hour format
-                penaltyPerHour: 1, // Points lost per hour late
-                completed: false,
-                pointsEarned: 0,
-                completedAt: null
-            },
-            {
-                id: 'task-2',
-                title: 'Brush teeth',
-                basePoints: 5,
-                targetTime: null, // No specific target time
-                penaltyPerHour: 0,
-                completed: false,
-                pointsEarned: 0,
-                completedAt: null
-            },
-            {
-                id: 'task-3',
-                title: 'Breakfast',
-                basePoints: 5,
-                targetTime: null,
-                penaltyPerHour: 0,
-                completed: false,
-                pointsEarned: 0,
-                completedAt: null
-            }
-        ]
+        tasks: defaultTasks,
+        adjustments: [] // Log of manual points adjustments: { id, type, amount, reason, timestamp }
     };
 
-    // DOM Elements
+    // DOM Elements - Navigation & Views
+    const navScheduleBtn = document.getElementById('nav-schedule-btn');
+    const navParentBtn = document.getElementById('nav-parent-btn');
+    const scheduleView = document.getElementById('schedule-view');
+    const parentView = document.getElementById('parent-view');
+
+    // DOM Elements - Kid Schedule View
     const totalScoreEl = document.getElementById('total-score');
     const currentDateEl = document.getElementById('current-date');
     const taskListEl = document.getElementById('task-list');
+    const kidTaskCountEl = document.getElementById('kid-task-count');
     const simulateTimeInput = document.getElementById('simulate-time');
     const resetBtn = document.getElementById('reset-btn');
     const liveTimeEl = document.getElementById('live-time');
 
-    // Initialize App
+    // DOM Elements - Parent Portal View
+    const lockPortalBtn = document.getElementById('lock-portal-btn');
+    const changePassBtn = document.getElementById('change-pass-btn');
+    const parentTotalScoreEl = document.getElementById('parent-total-score');
+    const parentEventCountEl = document.getElementById('parent-event-count');
+    const parentAdjCountEl = document.getElementById('parent-adj-count');
+    const openAddEventBtn = document.getElementById('open-add-event-btn');
+    const openAdjustPointsBtn = document.getElementById('open-adjust-points-btn');
+    const parentEventListEl = document.getElementById('parent-event-list');
+    const pointsHistoryListEl = document.getElementById('points-history-list');
+
+    // DOM Elements - Modals & Forms
+    const passwordModal = document.getElementById('password-modal');
+    const passwordForm = document.getElementById('password-form');
+    const parentPasswordInput = document.getElementById('parent-password-input');
+    const togglePassVisibilityBtn = document.getElementById('toggle-pass-visibility');
+    const passwordErrorMsg = document.getElementById('password-error');
+    const closePasswordModalBtn = document.getElementById('close-password-modal');
+    const cancelPasswordBtn = document.getElementById('cancel-password-btn');
+
+    const eventModal = document.getElementById('event-modal');
+    const eventModalTitle = document.getElementById('event-modal-title');
+    const eventForm = document.getElementById('event-form');
+    const eventEditIdInput = document.getElementById('event-edit-id');
+    const eventTitleInput = document.getElementById('event-title-input');
+    const eventPointsInput = document.getElementById('event-points-input');
+    const eventTimeInput = document.getElementById('event-time-input');
+    const eventPenaltyInput = document.getElementById('event-penalty-input');
+    const closeEventModalBtn = document.getElementById('close-event-modal');
+    const cancelEventBtn = document.getElementById('cancel-event-btn');
+
+    const pointsModal = document.getElementById('points-modal');
+    const pointsForm = document.getElementById('points-form');
+    const pointsAmountInput = document.getElementById('points-amount-input');
+    const pointsReasonInput = document.getElementById('points-reason-input');
+    const closePointsModalBtn = document.getElementById('close-points-modal');
+    const cancelPointsBtn = document.getElementById('cancel-points-btn');
+
+    const changePassModal = document.getElementById('change-pass-modal');
+    const changePassForm = document.getElementById('change-pass-form');
+    const currentPassInput = document.getElementById('current-pass-input');
+    const newPassInput = document.getElementById('new-pass-input');
+    const confirmPassInput = document.getElementById('confirm-pass-input');
+    const passChangeError = document.getElementById('pass-change-error');
+    const closeChangePassModalBtn = document.getElementById('close-change-pass-modal');
+    const cancelChangePassBtn = document.getElementById('cancel-change-pass-btn');
+
+    // Initialize Application
     function init() {
         loadState();
         checkDailyReset();
+        recalculateTotalScore();
         renderDate();
-        renderTasks();
-        updateScoreDisplay();
+        renderScheduleTasks();
+        renderParentPortal();
+        updateScoreDisplays();
         startLiveClock();
+        setupEventListeners();
     }
 
-    // Start clock to display current time at the bottom
+    // Load state from local storage
+    function loadState() {
+        const savedState = localStorage.getItem('powerflow_state');
+        if (savedState) {
+            try {
+                const parsed = JSON.parse(savedState);
+                state = { ...state, ...parsed };
+                // Ensure arrays exist
+                if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
+                if (!Array.isArray(state.adjustments)) state.adjustments = [];
+                if (!state.parentPassword) state.parentPassword = '1234';
+            } catch (e) {
+                console.error("Failed to parse saved state:", e);
+            }
+        }
+        // Always lock portal on fresh session load
+        state.isParentUnlocked = false;
+    }
+
+    // Save state to local storage
+    function saveState() {
+        const stateToSave = {
+            score: state.score,
+            parentPassword: state.parentPassword,
+            lastResetDate: state.lastResetDate,
+            tasks: state.tasks,
+            adjustments: state.adjustments
+        };
+        localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
+    }
+
+    // Recalculate score from task earnings + manual adjustments
+    function recalculateTotalScore() {
+        let taskScore = 0;
+        state.tasks.forEach(t => {
+            if (t.completed) {
+                taskScore += (t.pointsEarned !== undefined ? t.pointsEarned : t.basePoints);
+            }
+        });
+
+        let adjScore = 0;
+        state.adjustments.forEach(adj => {
+            if (adj.type === 'add') {
+                adjScore += adj.amount;
+            } else if (adj.type === 'subtract') {
+                adjScore -= adj.amount;
+            }
+        });
+
+        state.score = Math.max(0, taskScore + adjScore);
+    }
+
+    // Reset daily tasks if a new day has started
+    function checkDailyReset() {
+        const today = new Date().toDateString();
+        if (state.lastResetDate !== today) {
+            state.lastResetDate = today;
+            state.tasks.forEach(t => {
+                t.completed = false;
+                t.pointsEarned = 0;
+                t.completedAt = null;
+            });
+            recalculateTotalScore();
+            saveState();
+        }
+    }
+
+    // Clock display
     function startLiveClock() {
         const updateClock = () => {
             const now = new Date();
@@ -63,124 +193,103 @@ document.addEventListener('DOMContentLoaded', () => {
             const m = now.getMinutes().toString().padStart(2, '0');
             const s = now.getSeconds().toString().padStart(2, '0');
             const ampm = h >= 12 ? 'PM' : 'AM';
-            h = h % 12 || 12; // Convert to 12-hour format
+            h = h % 12 || 12;
             liveTimeEl.textContent = `${h}:${m}:${s} ${ampm}`;
         };
-        updateClock(); // Initial call
+        updateClock();
         setInterval(updateClock, 1000);
     }
 
-    // Load state from local storage
-    function loadState() {
-        const savedState = localStorage.getItem('powerflow_state');
-        if (savedState) {
-            state = JSON.parse(savedState);
-        }
-    }
-
-    // Save state to local storage
-    function saveState() {
-        localStorage.setItem('powerflow_state', JSON.stringify(state));
-    }
-
-    // Reset daily tasks if it's a new day
-    function checkDailyReset() {
-        const today = new Date().toDateString();
-        if (state.lastResetDate !== today) {
-            state.score = 0;
-            state.lastResetDate = today;
-            state.tasks.forEach(t => {
-                t.completed = false;
-                t.pointsEarned = 0;
-                t.completedAt = null;
-            });
-            saveState();
-        }
-    }
-
-    // Set current date display
+    // Format current date
     function renderDate() {
         const options = { weekday: 'long', month: 'long', day: 'numeric' };
         currentDateEl.textContent = new Date().toLocaleDateString('en-US', options);
     }
 
-    // Calculate points based on time
+    // Helper to format 24h time string into 12h AM/PM
+    function formatTime(timeStr) {
+        if (!timeStr) return '';
+        const [hourStr, minStr] = timeStr.split(':');
+        let h = parseInt(hourStr, 10);
+        if (isNaN(h)) return '';
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12 || 12;
+        return `${h}:${minStr} ${ampm}`;
+    }
+
+    // Calculate points for task completion based on time
     function calculatePoints(task, completedTimeStr) {
-        if (!task.targetTime || task.penaltyPerHour === 0) {
+        if (!task.targetTime || !task.penaltyPerHour || task.penaltyPerHour <= 0) {
             return task.basePoints;
         }
 
-        // Parse target time
         const [targetHour, targetMin] = task.targetTime.split(':').map(Number);
-        
-        // Parse completed time
         const [compHour, compMin] = completedTimeStr.split(':').map(Number);
 
-        // Convert to absolute minutes for easier comparison
         const targetAbsMinutes = targetHour * 60 + targetMin;
         const compAbsMinutes = compHour * 60 + compMin;
 
         if (compAbsMinutes <= targetAbsMinutes) {
-            return task.basePoints; // On time or early
+            return task.basePoints;
         }
 
-        // Calculate hours late (rounded down for full hours, or can be fractional, but let's use floor for "every hour he sleeps in")
         const minutesLate = compAbsMinutes - targetAbsMinutes;
         const hoursLate = Math.floor(minutesLate / 60);
 
         const pointsLost = hoursLate * task.penaltyPerHour;
-        const finalPoints = Math.max(0, task.basePoints - pointsLost); // Don't go below 0
-
-        return finalPoints;
+        return Math.max(0, task.basePoints - pointsLost);
     }
 
-    // Handle task completion toggle
+    // Toggle task completion in Kid View
     function toggleTask(taskId) {
         const task = state.tasks.find(t => t.id === taskId);
         if (!task) return;
 
         if (!task.completed) {
-            // Get time from simulator for testing, or current real time
             const timeVal = simulateTimeInput.value;
             let completedTimeStr = timeVal;
-            
             if (!completedTimeStr) {
-                 const now = new Date();
-                 completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+                const now = new Date();
+                completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             }
 
             const earned = calculatePoints(task, completedTimeStr);
             task.completed = true;
             task.pointsEarned = earned;
             task.completedAt = completedTimeStr;
-            state.score += earned;
         } else {
-            // Uncheck task
             task.completed = false;
-            state.score -= task.pointsEarned;
             task.pointsEarned = 0;
             task.completedAt = null;
         }
 
+        recalculateTotalScore();
         saveState();
-        renderTasks();
-        updateScoreDisplay();
+        renderScheduleTasks();
+        renderParentPortal();
+        updateScoreDisplays();
     }
 
-    // Render the task list to the DOM
-    function renderTasks() {
-        taskListEl.innerHTML = ''; // Clear current
+    // Render Kid View Schedule
+    function renderScheduleTasks() {
+        taskListEl.innerHTML = '';
+        kidTaskCountEl.textContent = `${state.tasks.length} Event${state.tasks.length !== 1 ? 's' : ''}`;
+
+        if (state.tasks.length === 0) {
+            taskListEl.innerHTML = `<div class="empty-state">No scheduled events yet. Ask a parent to add events!</div>`;
+            return;
+        }
 
         state.tasks.forEach(task => {
             const card = document.createElement('div');
             card.className = `task-card ${task.completed ? 'completed' : ''}`;
-            
+
             let timeInfo = '';
             if (task.targetTime) {
                 timeInfo = `<span class="task-target">Target: ${formatTime(task.targetTime)}</span>`;
             }
-            if (task.completed) {
-                timeInfo += ` <span>(Completed: ${formatTime(task.completedAt)})</span>`;
+            if (task.completed && task.completedAt) {
+                timeInfo += ` <span>(Done: ${formatTime(task.completedAt)})</span>`;
             }
 
             let penaltyInfo = '';
@@ -201,20 +310,117 @@ document.addEventListener('DOMContentLoaded', () => {
             `;
 
             card.querySelector('.complete-btn').addEventListener('click', () => toggleTask(task.id));
-
             taskListEl.appendChild(card);
         });
     }
 
-    // Update the large score display
-    function updateScoreDisplay() {
-        // Animate score increment (simple version)
-        const currentDisplayed = parseInt(totalScoreEl.textContent);
+    // Render Parent Portal Views (Events list + Audit log + Stats)
+    function renderParentPortal() {
+        parentTotalScoreEl.textContent = state.score;
+        parentEventCountEl.textContent = state.tasks.length;
+        parentAdjCountEl.textContent = state.adjustments.length;
+
+        renderParentEventList();
+        renderPointsAuditLog();
+    }
+
+    // Render Parent Schedule Management List (With Add / Subtract controls)
+    function renderParentEventList() {
+        parentEventListEl.innerHTML = '';
+
+        if (state.tasks.length === 0) {
+            parentEventListEl.innerHTML = `<div class="empty-state">No events scheduled. Click "+ Add New Event" above to create one.</div>`;
+            return;
+        }
+
+        state.tasks.forEach(task => {
+            const card = document.createElement('div');
+            card.className = 'parent-event-card';
+
+            const timeDisplay = task.targetTime ? formatTime(task.targetTime) : 'Anytime';
+            const penaltyDisplay = task.penaltyPerHour > 0 ? `-${task.penaltyPerHour} pts/hr late` : 'No penalty';
+
+            card.innerHTML = `
+                <div class="parent-event-info">
+                    <div class="parent-event-title">${task.title}</div>
+                    <div class="parent-event-meta">
+                        <span class="event-tag">${task.basePoints} pts</span>
+                        <span class="event-tag">⏰ ${timeDisplay}</span>
+                        <span class="event-tag">${penaltyDisplay}</span>
+                        ${task.completed ? '<span class="badge badge-success">Completed Today</span>' : ''}
+                    </div>
+                </div>
+                <div class="parent-event-actions">
+                    <button class="btn-icon edit-event-btn" title="Edit Event">✏️</button>
+                    <button class="btn-danger subtract-event-btn" title="Subtract/Remove Event">➖ Delete</button>
+                </div>
+            `;
+
+            // Edit Event Event Listener
+            card.querySelector('.edit-event-btn').addEventListener('click', () => openEditEventModal(task));
+
+            // Subtract / Delete Event Listener
+            card.querySelector('.subtract-event-btn').addEventListener('click', () => subtractEvent(task.id));
+
+            parentEventListEl.appendChild(card);
+        });
+    }
+
+    // Subtract/Delete event from schedule
+    function subtractEvent(taskId) {
+        const task = state.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        if (confirm(`Are you sure you want to subtract "${task.title}" from the schedule?`)) {
+            state.tasks = state.tasks.filter(t => t.id !== taskId);
+            recalculateTotalScore();
+            saveState();
+            renderScheduleTasks();
+            renderParentPortal();
+            updateScoreDisplays();
+        }
+    }
+
+    // Render Points Audit History Log
+    function renderPointsAuditLog() {
+        pointsHistoryListEl.innerHTML = '';
+
+        if (state.adjustments.length === 0) {
+            pointsHistoryListEl.innerHTML = `<div class="empty-state" style="font-size: 0.85rem; padding: 1rem; color: var(--text-secondary);">No manual point adjustments recorded yet.</div>`;
+            return;
+        }
+
+        // Show newest first
+        const sorted = [...state.adjustments].reverse();
+        sorted.forEach(adj => {
+            const item = document.createElement('div');
+            item.className = 'history-item';
+
+            const isPositive = adj.type === 'add';
+            const sign = isPositive ? '+' : '-';
+            const amountClass = isPositive ? 'positive' : 'negative';
+
+            item.innerHTML = `
+                <div class="history-details">
+                    <span class="history-reason">${adj.reason || 'Manual Adjustment'}</span>
+                    <span class="history-time">${adj.timestamp}</span>
+                </div>
+                <span class="history-amount ${amountClass}">${sign}${adj.amount} pts</span>
+            `;
+
+            pointsHistoryListEl.appendChild(item);
+        });
+    }
+
+    // Update total score UI displays with pop animation
+    function updateScoreDisplays() {
+        const currentDisplayed = parseInt(totalScoreEl.textContent, 10);
         const target = state.score;
-        
+
         if (currentDisplayed !== target) {
             totalScoreEl.textContent = target;
-            // Add a little pop animation class
+            parentTotalScoreEl.textContent = target;
+
             totalScoreEl.style.transform = 'scale(1.2)';
             setTimeout(() => {
                 totalScoreEl.style.transform = 'scale(1)';
@@ -222,31 +428,265 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Helper: format 24h time to 12h AM/PM
-    function formatTime(timeStr) {
-        if (!timeStr) return '';
-        const [hourStr, minStr] = timeStr.split(':');
-        let h = parseInt(hourStr);
-        const ampm = h >= 12 ? 'PM' : 'AM';
-        h = h % 12 || 12;
-        return `${h}:${minStr} ${ampm}`;
+    // View Navigation Logic
+    function switchToScheduleView() {
+        navScheduleBtn.classList.add('active');
+        navParentBtn.classList.remove('active');
+        scheduleView.classList.remove('hidden');
+        scheduleView.classList.add('active');
+        parentView.classList.add('hidden');
+        parentView.classList.remove('active');
     }
 
-    // Reset button for testing
-    resetBtn.addEventListener('click', () => {
-        if(confirm("Are you sure you want to reset today's progress?")) {
-            state.score = 0;
-            state.tasks.forEach(t => {
-                t.completed = false;
-                t.pointsEarned = 0;
-                t.completedAt = null;
-            });
-            saveState();
-            renderTasks();
-            updateScoreDisplay();
+    function switchToParentView() {
+        if (!state.isParentUnlocked) {
+            openPasswordModal();
+            return;
         }
-    });
+        navParentBtn.classList.add('active');
+        navScheduleBtn.classList.remove('active');
+        parentView.classList.remove('hidden');
+        parentView.classList.add('active');
+        scheduleView.classList.add('hidden');
+        scheduleView.classList.remove('active');
+        renderParentPortal();
+    }
 
-    // Run initialization
+    // Password Security Modal Functions
+    function openPasswordModal() {
+        passwordErrorMsg.classList.add('hidden');
+        parentPasswordInput.value = '';
+        parentPasswordInput.type = 'password';
+        togglePassVisibilityBtn.textContent = '👁️';
+        passwordModal.classList.remove('hidden');
+        setTimeout(() => parentPasswordInput.focus(), 100);
+    }
+
+    function closePasswordModal() {
+        passwordModal.classList.add('hidden');
+    }
+
+    function lockParentPortal() {
+        state.isParentUnlocked = false;
+        switchToScheduleView();
+    }
+
+    // Event Modal Functions (Add & Edit)
+    function openAddEventModal() {
+        eventModalTitle.textContent = 'Add New Scheduled Event';
+        eventEditIdInput.value = '';
+        eventTitleInput.value = '';
+        eventPointsInput.value = '5';
+        eventTimeInput.value = '';
+        eventPenaltyInput.value = '1';
+        eventModal.classList.remove('hidden');
+        setTimeout(() => eventTitleInput.focus(), 100);
+    }
+
+    function openEditEventModal(task) {
+        eventModalTitle.textContent = 'Edit Scheduled Event';
+        eventEditIdInput.value = task.id;
+        eventTitleInput.value = task.title;
+        eventPointsInput.value = task.basePoints;
+        eventTimeInput.value = task.targetTime || '';
+        eventPenaltyInput.value = task.penaltyPerHour || 0;
+        eventModal.classList.remove('hidden');
+        setTimeout(() => eventTitleInput.focus(), 100);
+    }
+
+    function closeEventModal() {
+        eventModal.classList.add('hidden');
+    }
+
+    // Points Modal Functions
+    function openPointsModal() {
+        pointsAmountInput.value = '5';
+        pointsReasonInput.value = '';
+        pointsModal.classList.remove('hidden');
+        setTimeout(() => pointsAmountInput.focus(), 100);
+    }
+
+    function closePointsModal() {
+        pointsModal.classList.add('hidden');
+    }
+
+    // Change Password Modal Functions
+    function openChangePassModal() {
+        currentPassInput.value = '';
+        newPassInput.value = '';
+        confirmPassInput.value = '';
+        passChangeError.classList.add('hidden');
+        changePassModal.classList.remove('hidden');
+        setTimeout(() => currentPassInput.focus(), 100);
+    }
+
+    function closeChangePassModal() {
+        changePassModal.classList.add('hidden');
+    }
+
+    // Setup Event Listeners
+    function setupEventListeners() {
+        // Nav tab switches
+        navScheduleBtn.addEventListener('click', switchToScheduleView);
+        navParentBtn.addEventListener('click', switchToParentView);
+
+        // Password Modal Handlers
+        togglePassVisibilityBtn.addEventListener('click', () => {
+            const isPass = parentPasswordInput.type === 'password';
+            parentPasswordInput.type = isPass ? 'text' : 'password';
+            togglePassVisibilityBtn.textContent = isPass ? '🙈' : '👁️';
+        });
+
+        passwordForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const inputVal = parentPasswordInput.value.trim();
+            if (inputVal === state.parentPassword) {
+                state.isParentUnlocked = true;
+                closePasswordModal();
+                switchToParentView();
+            } else {
+                passwordErrorMsg.classList.remove('hidden');
+                parentPasswordInput.select();
+            }
+        });
+
+        closePasswordModalBtn.addEventListener('click', closePasswordModal);
+        cancelPasswordBtn.addEventListener('click', closePasswordModal);
+
+        // Parent Control Buttons
+        lockPortalBtn.addEventListener('click', lockParentPortal);
+        changePassBtn.addEventListener('click', openChangePassModal);
+        openAddEventBtn.addEventListener('click', openAddEventModal);
+        openAdjustPointsBtn.addEventListener('click', openPointsModal);
+
+        // Event Modal Submit (Save Event)
+        eventForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const editId = eventEditIdInput.value;
+            const title = eventTitleInput.value.trim();
+            const basePoints = parseInt(eventPointsInput.value, 10) || 0;
+            const targetTime = eventTimeInput.value || null;
+            const penaltyPerHour = parseInt(eventPenaltyInput.value, 10) || 0;
+
+            if (!title) return;
+
+            if (editId) {
+                // Update existing
+                const task = state.tasks.find(t => t.id === editId);
+                if (task) {
+                    task.title = title;
+                    task.basePoints = basePoints;
+                    task.targetTime = targetTime;
+                    task.penaltyPerHour = penaltyPerHour;
+                }
+            } else {
+                // Add new task
+                const newTask = {
+                    id: `task-${Date.now()}`,
+                    title,
+                    basePoints,
+                    targetTime,
+                    penaltyPerHour,
+                    completed: false,
+                    pointsEarned: 0,
+                    completedAt: null
+                };
+                state.tasks.push(newTask);
+            }
+
+            recalculateTotalScore();
+            saveState();
+            renderScheduleTasks();
+            renderParentPortal();
+            updateScoreDisplays();
+            closeEventModal();
+        });
+
+        closeEventModalBtn.addEventListener('click', closeEventModal);
+        cancelEventBtn.addEventListener('click', closeEventModal);
+
+        // Points Form Submit (Apply Manual Adjustment)
+        pointsForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const type = document.querySelector('input[name="adjust-type"]:checked').value;
+            const amount = parseInt(pointsAmountInput.value, 10) || 0;
+            const reason = pointsReasonInput.value.trim() || (type === 'add' ? 'Bonus Points' : 'Penalty Deduction');
+
+            if (amount <= 0) return;
+
+            const now = new Date();
+            const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+            state.adjustments.push({
+                id: `adj-${Date.now()}`,
+                type,
+                amount,
+                reason,
+                timestamp: timeStr
+            });
+
+            recalculateTotalScore();
+            saveState();
+            renderParentPortal();
+            updateScoreDisplays();
+            closePointsModal();
+        });
+
+        closePointsModalBtn.addEventListener('click', closePointsModal);
+        cancelPointsBtn.addEventListener('click', closePointsModal);
+
+        // Change Password Form Submit
+        changePassForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const curr = currentPassInput.value.trim();
+            const newP = newPassInput.value.trim();
+            const confP = confirmPassInput.value.trim();
+
+            if (curr !== state.parentPassword) {
+                passChangeError.textContent = 'Current password is incorrect.';
+                passChangeError.classList.remove('hidden');
+                return;
+            }
+
+            if (!newP) {
+                passChangeError.textContent = 'New password cannot be blank.';
+                passChangeError.classList.remove('hidden');
+                return;
+            }
+
+            if (newP !== confP) {
+                passChangeError.textContent = 'New passwords do not match.';
+                passChangeError.classList.remove('hidden');
+                return;
+            }
+
+            state.parentPassword = newP;
+            saveState();
+            closeChangePassModal();
+            alert('Parent password successfully updated!');
+        });
+
+        closeChangePassModalBtn.addEventListener('click', closeChangePassModal);
+        cancelChangePassBtn.addEventListener('click', closeChangePassModal);
+
+        // Reset Day Button (Kid View)
+        resetBtn.addEventListener('click', () => {
+            if (confirm("Are you sure you want to reset today's task completions?")) {
+                state.tasks.forEach(t => {
+                    t.completed = false;
+                    t.pointsEarned = 0;
+                    t.completedAt = null;
+                });
+                recalculateTotalScore();
+                saveState();
+                renderScheduleTasks();
+                renderParentPortal();
+                updateScoreDisplays();
+            }
+        });
+    }
+
+    // Run Initialization
     init();
 });
+

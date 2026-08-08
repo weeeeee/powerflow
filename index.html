@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PowerFlow | Daily Routine</title>
+    <title>PowerFlow | Daily Routine & Parent Portal</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -14,31 +14,98 @@
         <header class="app-header">
             <h1>PowerFlow</h1>
             <p class="subtitle">Master your day, one habit at a time.</p>
+            <nav class="view-nav">
+                <button id="nav-schedule-btn" class="nav-tab active">📋 Routine Schedule</button>
+                <button id="nav-parent-btn" class="nav-tab">🔒 Parent Portal</button>
+            </nav>
         </header>
 
-        <section class="score-section">
-            <div class="score-circle">
-                <span id="total-score">0</span>
-                <span class="score-label">Points</span>
-            </div>
-            <div class="date-display" id="current-date">Today</div>
-        </section>
+        <!-- Kid Schedule View -->
+        <div id="schedule-view" class="view-content active">
+            <section class="score-section">
+                <div class="score-circle">
+                    <span id="total-score">0</span>
+                    <span class="score-label">Points</span>
+                </div>
+                <div class="date-display" id="current-date">Today</div>
+            </section>
 
-        <section class="schedule-section">
-            <h2>Your Schedule</h2>
-            <div id="task-list" class="task-list">
-                <!-- Tasks will be injected here by JS -->
-            </div>
-        </section>
+            <section class="schedule-section">
+                <div class="section-header">
+                    <h2>Your Schedule</h2>
+                    <span class="task-count-badge" id="kid-task-count">0 Events</span>
+                </div>
+                <div id="task-list" class="task-list">
+                    <!-- Tasks will be injected here by JS -->
+                </div>
+            </section>
 
-        <!-- A hidden modal or form to simulate "completion time" for testing purposes -->
-        <div class="test-controls">
-            <h3>Test Controls</h3>
-            <label for="simulate-time">Simulate Current Time:</label>
-            <input type="time" id="simulate-time" value="08:00">
-            <button id="reset-btn" class="btn-secondary">Reset Day</button>
+            <!-- Test controls to simulate completion time -->
+            <div class="test-controls">
+                <h3>Test Controls</h3>
+                <div class="test-row">
+                    <label for="simulate-time">Simulate Time:</label>
+                    <input type="time" id="simulate-time" value="08:00">
+                    <button id="reset-btn" class="btn-secondary">Reset Day</button>
+                </div>
+            </div>
         </div>
-        
+
+        <!-- Parent Portal View -->
+        <div id="parent-view" class="view-content hidden">
+            <div class="parent-header-bar">
+                <h2>Parent Control Center</h2>
+                <div class="parent-actions-row">
+                    <button id="lock-portal-btn" class="btn-small btn-secondary">🔒 Lock Portal</button>
+                    <button id="change-pass-btn" class="btn-small btn-secondary">🔑 Password</button>
+                </div>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="portal-stats-grid">
+                <div class="stat-card">
+                    <span class="stat-value" id="parent-total-score">0</span>
+                    <span class="stat-label">Total Score</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="parent-event-count">0</span>
+                    <span class="stat-label">Events</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-value" id="parent-adj-count">0</span>
+                    <span class="stat-label">Adjustments</span>
+                </div>
+            </div>
+
+            <!-- Management Buttons -->
+            <div class="management-controls">
+                <button id="open-add-event-btn" class="btn-primary">+ Add New Event</button>
+                <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points (+ / -)</button>
+            </div>
+
+            <!-- Schedule Management Section -->
+            <section class="portal-section">
+                <div class="section-header">
+                    <h3>Manage Schedule Events</h3>
+                    <span class="sub-text">Add, edit, or subtract events</span>
+                </div>
+                <div id="parent-event-list" class="parent-event-list">
+                    <!-- Parent event management items injected here -->
+                </div>
+            </section>
+
+            <!-- Points History & Adjustments Audit Log -->
+            <section class="portal-section">
+                <div class="section-header">
+                    <h3>Points Audit Log</h3>
+                    <span class="sub-text">Manual adjustments & task history</span>
+                </div>
+                <div id="points-history-list" class="points-history-list">
+                    <!-- History entries injected here -->
+                </div>
+            </section>
+        </div>
+
         <footer class="app-footer">
             <div class="current-time-display">
                 Current Time: <span id="live-time">--:--:--</span>
@@ -46,6 +113,143 @@
         </footer>
     </main>
 
+    <!-- Modal: Unlock Parent Portal Password -->
+    <div id="password-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3>Parent Portal Security</h3>
+                <button class="close-modal-btn" id="close-password-modal">&times;</button>
+            </div>
+            <form id="password-form" class="modal-body">
+                <p class="modal-instruction">Enter parent passcode to access controls.</p>
+                <div class="input-group">
+                    <label for="parent-password-input">Password / PIN:</label>
+                    <div class="password-field-wrapper">
+                        <input type="password" id="parent-password-input" placeholder="Enter password..." required autofocus>
+                        <button type="button" id="toggle-pass-visibility" class="toggle-pass-btn" aria-label="Toggle password visibility">👁️</button>
+                    </div>
+                    <span id="password-error" class="error-msg hidden">Incorrect password. Please try again.</span>
+                </div>
+                <p class="hint-text">Default password is <strong>1234</strong></p>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-password-btn">Cancel</button>
+                    <button type="submit" class="btn-primary">Unlock Portal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Event -->
+    <div id="event-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3 id="event-modal-title">Add New Scheduled Event</h3>
+                <button class="close-modal-btn" id="close-event-modal">&times;</button>
+            </div>
+            <form id="event-form" class="modal-body">
+                <input type="hidden" id="event-edit-id">
+                
+                <div class="input-group">
+                    <label for="event-title-input">Event Name / Habit:</label>
+                    <input type="text" id="event-title-input" placeholder="e.g. Clean Bedroom, Read for 20 mins" required>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="event-points-input">Base Points:</label>
+                        <input type="number" id="event-points-input" min="0" max="1000" value="5" required>
+                    </div>
+
+                    <div class="input-group">
+                        <label for="event-time-input">Target Time (Optional):</label>
+                        <input type="time" id="event-time-input">
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="event-penalty-input">Penalty per Hour Late (Points lost/hr):</label>
+                    <input type="number" id="event-penalty-input" min="0" max="100" value="1">
+                    <span class="hint-text">Deducted from base points if completed after target time.</span>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-event-btn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-event-btn">Save Event</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Adjust Points Manually -->
+    <div id="points-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3>Apply Point Adjustment</h3>
+                <button class="close-modal-btn" id="close-points-modal">&times;</button>
+            </div>
+            <form id="points-form" class="modal-body">
+                <div class="input-group">
+                    <label>Adjustment Type:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="adjust-type" value="add" checked>
+                            <span class="badge badge-success">+ Add Points (Bonus)</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="adjust-type" value="subtract">
+                            <span class="badge badge-danger">- Subtract Points (Deduction)</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label for="points-amount-input">Point Amount:</label>
+                    <input type="number" id="points-amount-input" min="1" max="1000" value="5" required>
+                </div>
+
+                <div class="input-group">
+                    <label for="points-reason-input">Reason / Note:</label>
+                    <input type="text" id="points-reason-input" placeholder="e.g. Helped with groceries, Didn't do chores" required>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-points-btn">Cancel</button>
+                    <button type="submit" class="btn-accent">Apply Points</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Change Password -->
+    <div id="change-pass-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3>Change Parent Password</h3>
+                <button class="close-modal-btn" id="close-change-pass-modal">&times;</button>
+            </div>
+            <form id="change-pass-form" class="modal-body">
+                <div class="input-group">
+                    <label for="current-pass-input">Current Password:</label>
+                    <input type="password" id="current-pass-input" placeholder="Current password..." required>
+                </div>
+                <div class="input-group">
+                    <label for="new-pass-input">New Password / PIN:</label>
+                    <input type="password" id="new-pass-input" placeholder="New password..." required>
+                </div>
+                <div class="input-group">
+                    <label for="confirm-pass-input">Confirm New Password:</label>
+                    <input type="password" id="confirm-pass-input" placeholder="Confirm new password..." required>
+                    <span id="pass-change-error" class="error-msg hidden">Passwords do not match or incorrect current password.</span>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-change-pass-btn">Cancel</button>
+                    <button type="submit" class="btn-primary">Update Password</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="app.js"></script>
 </body>
 </html>
+
