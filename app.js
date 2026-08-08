@@ -53,6 +53,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
 
+    // Default initial store items
+    const defaultStoreItems = [
+        { id: 'store-1', title: '$5.00 Cash', points: 50, icon: '💵' },
+        { id: 'store-2', title: 'Extra 30 mins Screen Time', points: 30, icon: '🎮' },
+        { id: 'store-3', title: 'DoorDash Delivery', points: 200, icon: '🍔' }
+    ];
+
     // Application State
     let state = {
         score: 0,
@@ -63,13 +70,16 @@ document.addEventListener('DOMContentLoaded', () => {
         lastResetDate: new Date().toDateString(),
         tasks: defaultTasks,
         sideQuests: defaultSideQuests,
+        storeItems: defaultStoreItems,
         adjustments: [] // Log of manual points adjustments: { id, type, amount, reason, timestamp }
     };
 
     // DOM Elements - Navigation & Views
     const navScheduleBtn = document.getElementById('nav-schedule-btn');
+    const navStoreBtn = document.getElementById('nav-store-btn');
     const navParentBtn = document.getElementById('nav-parent-btn');
     const scheduleView = document.getElementById('schedule-view');
+    const storeView = document.getElementById('store-view');
     const parentView = document.getElementById('parent-view');
 
     // DOM Elements - Kid Schedule View
@@ -81,6 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const resetBtn = document.getElementById('reset-btn');
     const liveTimeEl = document.getElementById('live-time');
 
+    // DOM Elements - Kid Store View
+    const storeTotalScoreEl = document.getElementById('store-total-score');
+    const storeListEl = document.getElementById('store-list');
+    const kidStoreCountEl = document.getElementById('kid-store-count');
+
     // DOM Elements - Parent Portal View
     const lockPortalBtn = document.getElementById('lock-portal-btn');
     const changePassBtn = document.getElementById('change-pass-btn');
@@ -88,8 +103,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const parentEventCountEl = document.getElementById('parent-event-count');
     const parentAdjCountEl = document.getElementById('parent-adj-count');
     const openAddEventBtn = document.getElementById('open-add-event-btn');
+    const openAddStoreBtn = document.getElementById('open-add-store-btn');
     const openAdjustPointsBtn = document.getElementById('open-adjust-points-btn');
     const parentEventListEl = document.getElementById('parent-event-list');
+    const parentStoreListEl = document.getElementById('parent-store-list');
     const pointsHistoryListEl = document.getElementById('points-history-list');
 
     // DOM Elements - Modals & Forms
@@ -111,6 +128,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const eventPenaltyInput = document.getElementById('event-penalty-input');
     const closeEventModalBtn = document.getElementById('close-event-modal');
     const cancelEventBtn = document.getElementById('cancel-event-btn');
+
+    const storeModal = document.getElementById('store-modal');
+    const storeForm = document.getElementById('store-form');
+    const closeStoreModalBtn = document.getElementById('close-store-modal');
+    const cancelStoreBtn = document.getElementById('cancel-store-btn');
 
     const pointsModal = document.getElementById('points-modal');
     const pointsForm = document.getElementById('points-form');
@@ -136,6 +158,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderDate();
         renderScheduleTasks();
         renderSideQuests();
+        renderStore();
         renderParentPortal();
         updateScoreDisplays();
         startLiveClock();
@@ -152,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Ensure arrays exist
                 if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
                 if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
+                if (!Array.isArray(state.storeItems)) state.storeItems = defaultStoreItems;
                 if (!Array.isArray(state.adjustments)) state.adjustments = [];
                 if (!state.parentPassword) state.parentPassword = '1234';
                 if (typeof state.weeklyScore !== 'number') state.weeklyScore = 0;
@@ -174,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
             sideQuests: state.sideQuests,
+            storeItems: state.storeItems,
             adjustments: state.adjustments
         };
         localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
@@ -495,6 +520,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderParentEventList();
         renderParentQuestList();
+        renderParentStoreList();
         renderPointsAuditLog();
     }
 
@@ -627,6 +653,138 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Render Kid Store View
+    function renderStore() {
+        if (!storeListEl) return;
+        storeListEl.innerHTML = '';
+        if (storeTotalScoreEl) storeTotalScoreEl.textContent = state.score;
+        if (kidStoreCountEl) kidStoreCountEl.textContent = `${state.storeItems.length} Item${state.storeItems.length !== 1 ? 's' : ''}`;
+
+        if (state.storeItems.length === 0) {
+            storeListEl.innerHTML = `<div class="empty-state" style="grid-column: span 2;">No rewards available yet. Ask a parent to add some!</div>`;
+            return;
+        }
+
+        state.storeItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'store-card';
+            
+            const canAfford = state.score >= item.points;
+
+            card.innerHTML = `
+                <div class="store-icon">${item.icon || '🎁'}</div>
+                <div class="store-title">${item.title}</div>
+                <div class="store-cost">${item.points} pts</div>
+                <button class="btn-redeem" ${canAfford ? '' : 'disabled'}>
+                    ${canAfford ? 'Redeem Reward' : 'Not Enough Points'}
+                </button>
+            `;
+
+            if (canAfford) {
+                card.querySelector('.btn-redeem').addEventListener('click', () => purchaseItem(item));
+            }
+
+            storeListEl.appendChild(card);
+        });
+    }
+
+    function purchaseItem(item) {
+        if (state.score < item.points) return;
+        
+        if (confirm(`Are you sure you want to spend ${item.points} points on "${item.title}"?`)) {
+            const now = new Date();
+            const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+
+            state.adjustments.push({
+                id: `adj-${Date.now()}`,
+                type: 'subtract',
+                amount: item.points,
+                reason: `Purchased: ${item.title}`,
+                timestamp: timeStr
+            });
+
+            recalculateTotalScore();
+            saveState();
+            renderStore();
+            renderParentPortal();
+            updateScoreDisplays();
+            alert(`Success! You have purchased "${item.title}". Check with a parent to claim your reward.`);
+        }
+    }
+
+    // Render Parent Store Management List
+    function renderParentStoreList() {
+        if (!parentStoreListEl) return;
+        parentStoreListEl.innerHTML = '';
+        
+        if (state.storeItems.length === 0) {
+            parentStoreListEl.innerHTML = `<div class="empty-state">No items in the store. Click "🛒 + Store Item" above to add one.</div>`;
+            return;
+        }
+
+        state.storeItems.forEach(item => {
+            const card = document.createElement('div');
+            card.className = 'parent-event-card';
+
+            card.innerHTML = `
+                <div class="parent-event-info">
+                    <div class="parent-event-title">${item.icon || '🎁'} ${item.title}</div>
+                    <div class="parent-event-meta">
+                        <span class="event-tag">${item.points} pts to redeem</span>
+                    </div>
+                </div>
+                <div class="parent-event-actions">
+                    <button class="btn-icon edit-store-btn" title="Edit Store Item">✏️</button>
+                    <button class="btn-danger delete-store-btn" title="Delete Store Item">➖ Delete</button>
+                </div>
+            `;
+
+            card.querySelector('.edit-store-btn').addEventListener('click', () => openEditStoreModal(item));
+            card.querySelector('.delete-store-btn').addEventListener('click', () => deleteStoreItem(item.id));
+
+            parentStoreListEl.appendChild(card);
+        });
+    }
+
+    function deleteStoreItem(itemId) {
+        const item = state.storeItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        if (confirm(`Are you sure you want to delete "${item.title}" from the store?`)) {
+            state.storeItems = state.storeItems.filter(i => i.id !== itemId);
+            saveState();
+            renderStore();
+            renderParentPortal();
+        }
+    }
+
+    function openAddStoreModal() {
+        const titleEl = document.getElementById('store-modal-title');
+        if (titleEl) titleEl.textContent = 'Add New Store Reward';
+        document.getElementById('store-edit-id').value = '';
+        document.getElementById('store-title-input').value = '';
+        document.getElementById('store-points-input').value = '50';
+        document.getElementById('store-icon-input').value = '🎁';
+        storeModal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('store-title-input').focus(), 100);
+    }
+
+    function openEditStoreModal(item) {
+        const titleEl = document.getElementById('store-modal-title');
+        if (titleEl) titleEl.textContent = 'Edit Store Reward';
+        document.getElementById('store-edit-id').value = item.id;
+        document.getElementById('store-title-input').value = item.title;
+        document.getElementById('store-points-input').value = item.points;
+        document.getElementById('store-icon-input').value = item.icon || '🎁';
+        storeModal.classList.remove('hidden');
+        setTimeout(() => document.getElementById('store-title-input').focus(), 100);
+    }
+
+    function closeStoreModal() {
+        if (storeModal) storeModal.classList.add('hidden');
+    }
+
+
     // Update total score UI displays with pop animation
     function updateScoreDisplays() {
         const currentDisplayed = parseInt(totalScoreEl.textContent, 10);
@@ -635,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentDisplayed !== target) {
             totalScoreEl.textContent = target;
             parentTotalScoreEl.textContent = target;
+            if (storeTotalScoreEl) storeTotalScoreEl.textContent = target;
 
             totalScoreEl.style.transform = 'scale(1.2)';
             setTimeout(() => {
@@ -660,11 +819,31 @@ document.addEventListener('DOMContentLoaded', () => {
     // View Navigation Logic
     function switchToScheduleView() {
         navScheduleBtn.classList.add('active');
+        if (navStoreBtn) navStoreBtn.classList.remove('active');
         navParentBtn.classList.remove('active');
         scheduleView.classList.remove('hidden');
         scheduleView.classList.add('active');
+        if (storeView) {
+            storeView.classList.add('hidden');
+            storeView.classList.remove('active');
+        }
         parentView.classList.add('hidden');
         parentView.classList.remove('active');
+    }
+
+    function switchToStoreView() {
+        if (navStoreBtn) navStoreBtn.classList.add('active');
+        navScheduleBtn.classList.remove('active');
+        navParentBtn.classList.remove('active');
+        if (storeView) {
+            storeView.classList.remove('hidden');
+            storeView.classList.add('active');
+        }
+        scheduleView.classList.add('hidden');
+        scheduleView.classList.remove('active');
+        parentView.classList.add('hidden');
+        parentView.classList.remove('active');
+        renderStore();
     }
 
     function switchToParentView() {
@@ -674,10 +853,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         navParentBtn.classList.add('active');
         navScheduleBtn.classList.remove('active');
+        if (navStoreBtn) navStoreBtn.classList.remove('active');
         parentView.classList.remove('hidden');
         parentView.classList.add('active');
         scheduleView.classList.add('hidden');
         scheduleView.classList.remove('active');
+        if (storeView) {
+            storeView.classList.add('hidden');
+            storeView.classList.remove('active');
+        }
         renderParentPortal();
     }
 
@@ -762,6 +946,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setupEventListeners() {
         // Nav tab switches
         navScheduleBtn.addEventListener('click', switchToScheduleView);
+        if (navStoreBtn) navStoreBtn.addEventListener('click', switchToStoreView);
         navParentBtn.addEventListener('click', switchToParentView);
 
         // Password Modal Handlers
@@ -791,6 +976,7 @@ document.addEventListener('DOMContentLoaded', () => {
         lockPortalBtn.addEventListener('click', lockParentPortal);
         changePassBtn.addEventListener('click', openChangePassModal);
         openAddEventBtn.addEventListener('click', openAddEventModal);
+        if (openAddStoreBtn) openAddStoreBtn.addEventListener('click', openAddStoreModal);
         
         const openAddQuestBtn = document.getElementById('open-add-quest-btn');
         if (openAddQuestBtn) {
@@ -798,6 +984,44 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         openAdjustPointsBtn.addEventListener('click', openPointsModal);
+
+        // Store Modal Events
+        if (storeForm) {
+            storeForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const editId = document.getElementById('store-edit-id').value;
+                const title = document.getElementById('store-title-input').value.trim();
+                const points = parseInt(document.getElementById('store-points-input').value, 10) || 50;
+                const icon = document.getElementById('store-icon-input').value.trim() || '🎁';
+
+                if (!title) return;
+
+                if (!Array.isArray(state.storeItems)) state.storeItems = [];
+
+                if (editId) {
+                    const item = state.storeItems.find(i => i.id === editId);
+                    if (item) {
+                        item.title = title;
+                        item.points = points;
+                        item.icon = icon;
+                    }
+                } else {
+                    state.storeItems.push({
+                        id: `store-${Date.now()}`,
+                        title,
+                        points,
+                        icon
+                    });
+                }
+
+                saveState();
+                renderStore();
+                renderParentPortal();
+                closeStoreModal();
+            });
+        }
+        if (closeStoreModalBtn) closeStoreModalBtn.addEventListener('click', closeStoreModal);
+        if (cancelStoreBtn) cancelStoreBtn.addEventListener('click', closeStoreModal);
 
         // Event Modal Submit (Save Event)
         eventForm.addEventListener('submit', (e) => {

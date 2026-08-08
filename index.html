@@ -16,6 +16,7 @@
             <p class="subtitle">Master your day, one habit at a time.</p>
             <nav class="view-nav">
                 <button id="nav-schedule-btn" class="nav-tab active">📋 Routine Schedule</button>
+                <button id="nav-store-btn" class="nav-tab">🛒 Rewards Store</button>
                 <button id="nav-parent-btn" class="nav-tab">🔒 Parent Portal</button>
             </nav>
         </header>
@@ -72,6 +73,26 @@
             </div>
         </div>
 
+        <!-- Kid Store View -->
+        <div id="store-view" class="view-content hidden">
+            <section class="score-section">
+                <div class="score-circle">
+                    <span id="store-total-score">0</span>
+                    <span class="score-label">Points Available</span>
+                </div>
+            </section>
+
+            <section class="schedule-section">
+                <div class="section-header">
+                    <h2>🛒 Rewards Store</h2>
+                    <span class="task-count-badge" id="kid-store-count">0 Items</span>
+                </div>
+                <div id="store-list" class="store-grid">
+                    <!-- Store items will be injected here by JS -->
+                </div>
+            </section>
+        </div>
+
         <!-- Parent Portal View -->
         <div id="parent-view" class="view-content hidden">
             <div class="parent-header-bar">
@@ -111,9 +132,10 @@
             </div>
 
             <!-- Management Buttons -->
-            <div class="management-controls">
+            <div class="management-controls" style="flex-wrap: wrap;">
                 <button id="open-add-event-btn" class="btn-primary">+ Add Event</button>
                 <button id="open-add-quest-btn" class="btn-quest">⚔️ + Side Quest</button>
+                <button id="open-add-store-btn" class="btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #3b82f6);">🛒 + Store Item</button>
                 <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points</button>
             </div>
 
@@ -136,6 +158,17 @@
                 </div>
                 <div id="parent-quest-list" class="parent-event-list">
                     <!-- Parent side quest items injected here -->
+                </div>
+            </section>
+
+            <!-- Store Management Section -->
+            <section class="portal-section">
+                <div class="section-header">
+                    <h3>Manage Rewards Store</h3>
+                    <span class="sub-text">Add items kids can purchase with points</span>
+                </div>
+                <div id="parent-store-list" class="parent-event-list">
+                    <!-- Parent store management items injected here -->
                 </div>
             </section>
 
@@ -314,6 +347,40 @@
                 <div class="modal-footer">
                     <button type="button" class="btn-secondary" id="cancel-points-btn">Cancel</button>
                     <button type="submit" class="btn-accent">Apply Points</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add / Edit Store Item -->
+    <div id="store-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <h3 id="store-modal-title">Add New Store Reward</h3>
+                <button class="close-modal-btn" id="close-store-modal">&times;</button>
+            </div>
+            <form id="store-form" class="modal-body">
+                <input type="hidden" id="store-edit-id">
+                
+                <div class="input-group">
+                    <label for="store-title-input">Reward Title / Name:</label>
+                    <input type="text" id="store-title-input" placeholder="e.g. $5.00 Cash, Extra 30 mins screen time" required>
+                </div>
+
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="store-points-input">Point Cost:</label>
+                        <input type="number" id="store-points-input" min="1" max="10000" value="50" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="store-icon-input">Emoji / Icon (Optional):</label>
+                        <input type="text" id="store-icon-input" placeholder="e.g. 💵, 🎮" value="🎁">
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn-secondary" id="cancel-store-btn">Cancel</button>
+                    <button type="submit" class="btn-primary" id="save-store-btn" style="flex:1;">Save Reward</button>
                 </div>
             </form>
         </div>
