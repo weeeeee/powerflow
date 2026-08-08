@@ -669,14 +669,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'store-card';
             
-            const canAfford = state.score >= item.points;
+            const isAvailable = item.isAvailable !== false;
+            const canAfford = isAvailable && state.score >= item.points;
 
             card.innerHTML = `
                 <div class="store-icon">${item.icon || '🎁'}</div>
                 <div class="store-title">${item.title}</div>
                 <div class="store-cost">${item.points} pts</div>
-                <button class="btn-redeem" ${canAfford ? '' : 'disabled'}>
-                    ${canAfford ? 'Redeem Reward' : 'Not Enough Points'}
+                <button class="btn-redeem" ${canAfford ? '' : 'disabled'} style="${!isAvailable ? 'background: rgba(255,255,255,0.1); color: var(--text-secondary); cursor: not-allowed; box-shadow: none;' : ''}">
+                    ${!isAvailable ? 'Currently Unavailable' : (canAfford ? 'Redeem Reward' : 'Not Enough Points')}
                 </button>
             `;
 
@@ -726,9 +727,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const card = document.createElement('div');
             card.className = 'parent-event-card';
 
+            const isAvailable = item.isAvailable !== false;
+            const availBadge = isAvailable ? '' : '<span class="badge badge-danger" style="margin-left: 0.5rem;">Unavailable</span>';
+
             card.innerHTML = `
                 <div class="parent-event-info">
-                    <div class="parent-event-title">${item.icon || '🎁'} ${item.title}</div>
+                    <div class="parent-event-title">${item.icon || '🎁'} ${item.title} ${availBadge}</div>
                     <div class="parent-event-meta">
                         <span class="event-tag">${item.points} pts to redeem</span>
                     </div>
@@ -765,6 +769,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('store-title-input').value = '';
         document.getElementById('store-points-input').value = '50';
         document.getElementById('store-icon-input').value = '🎁';
+        const availInput = document.getElementById('store-available-input');
+        if (availInput) availInput.checked = true;
         storeModal.classList.remove('hidden');
         setTimeout(() => document.getElementById('store-title-input').focus(), 100);
     }
@@ -776,6 +782,8 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('store-title-input').value = item.title;
         document.getElementById('store-points-input').value = item.points;
         document.getElementById('store-icon-input').value = item.icon || '🎁';
+        const availInput = document.getElementById('store-available-input');
+        if (availInput) availInput.checked = item.isAvailable !== false;
         storeModal.classList.remove('hidden');
         setTimeout(() => document.getElementById('store-title-input').focus(), 100);
     }
@@ -993,6 +1001,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const title = document.getElementById('store-title-input').value.trim();
                 const points = parseInt(document.getElementById('store-points-input').value, 10) || 50;
                 const icon = document.getElementById('store-icon-input').value.trim() || '🎁';
+                const availInput = document.getElementById('store-available-input');
+                const isAvailable = availInput ? availInput.checked : true;
 
                 if (!title) return;
 
@@ -1004,13 +1014,15 @@ document.addEventListener('DOMContentLoaded', () => {
                         item.title = title;
                         item.points = points;
                         item.icon = icon;
+                        item.isAvailable = isAvailable;
                     }
                 } else {
                     state.storeItems.push({
                         id: `store-${Date.now()}`,
                         title,
                         points,
-                        icon
+                        icon,
+                        isAvailable
                     });
                 }
 
