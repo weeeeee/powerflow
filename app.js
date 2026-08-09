@@ -892,6 +892,63 @@ document.addEventListener('DOMContentLoaded', () => {
         switchToScheduleView();
     }
 
+    // Event Modal Functions
+    function openAddEventModal() {
+        if (eventModalTitle) eventModalTitle.textContent = 'Add New Scheduled Event';
+        eventEditIdInput.value = '';
+        eventTitleInput.value = '';
+        eventPointsInput.value = '5';
+        eventTimeInput.value = '';
+        eventPenaltyInput.value = '1';
+        eventModal.classList.remove('hidden');
+        setTimeout(() => eventTitleInput.focus(), 100);
+    }
+
+    function openEditEventModal(task) {
+        if (eventModalTitle) eventModalTitle.textContent = 'Edit Scheduled Event';
+        eventEditIdInput.value = task.id;
+        eventTitleInput.value = task.title;
+        eventPointsInput.value = task.basePoints;
+        eventTimeInput.value = task.targetTime || '';
+        eventPenaltyInput.value = task.penaltyPerHour;
+        eventModal.classList.remove('hidden');
+        setTimeout(() => eventTitleInput.focus(), 100);
+    }
+
+    function closeEventModal() {
+        eventModal.classList.add('hidden');
+    }
+
+    // Change Password Modal Functions
+    function openChangePassModal() {
+        const currInput = document.getElementById('current-pass-input');
+        if (currInput) currInput.value = '';
+        const newInput = document.getElementById('new-pass-input');
+        if (newInput) newInput.value = '';
+        const confInput = document.getElementById('confirm-pass-input');
+        if (confInput) confInput.value = '';
+        const errorEl = document.getElementById('pass-change-error');
+        if (errorEl) errorEl.classList.add('hidden');
+        if (changePassModal) changePassModal.classList.remove('hidden');
+        setTimeout(() => { if (currInput) currInput.focus(); }, 100);
+    }
+
+    function closeChangePassModal() {
+        if (changePassModal) changePassModal.classList.add('hidden');
+    }
+
+    // Adjust Points Modal Functions
+    function openPointsModal() {
+        if (pointsAmountInput) pointsAmountInput.value = '5';
+        if (pointsReasonInput) pointsReasonInput.value = '';
+        if (pointsModal) pointsModal.classList.remove('hidden');
+        setTimeout(() => { if (pointsAmountInput) pointsAmountInput.focus(); }, 100);
+    }
+
+    function closePointsModal() {
+        if (pointsModal) pointsModal.classList.add('hidden');
+    }
+
     // Side Quest Modal Functions (Add & Edit)
     function openAddQuestModal() {
         const questModalTitle = document.getElementById('quest-modal-title');
