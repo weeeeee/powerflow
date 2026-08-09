@@ -15,7 +15,7 @@
             <h1>PowerFlow</h1>
             <p class="subtitle">Master your day, one habit at a time.</p>
             <nav class="view-nav">
-                <button id="nav-schedule-btn" class="nav-tab active">📋 Routine Schedule</button>
+                <button id="nav-schedule-btn" class="nav-tab active">📋 Main Quest</button>
                 <button id="nav-store-btn" class="nav-tab">🛒 Rewards Store</button>
                 <button id="nav-parent-btn" class="nav-tab">🔒 Parent Portal</button>
             </nav>
@@ -26,7 +26,10 @@
             <section class="score-section">
                 <div class="score-circle">
                     <span id="total-score">0</span>
-                    <span class="score-label">Today</span>
+                    <span class="score-label">Points</span>
+                </div>
+                <div class="current-rank-display">
+                    <span id="current-rank-badge" class="badge-rank novice">Novice</span>
                 </div>
                 <div class="long-term-stats">
                     <div class="lt-stat">
@@ -43,8 +46,8 @@
 
             <section class="schedule-section">
                 <div class="section-header">
-                    <h2>Your Schedule</h2>
-                    <span class="task-count-badge" id="kid-task-count">0 Events</span>
+                    <h2>Your Main Quest</h2>
+                    <span class="task-count-badge" id="kid-task-count">0 Steps</span>
                 </div>
                 <div id="task-list" class="task-list">
                     <!-- Tasks will be injected here by JS -->
@@ -142,8 +145,8 @@
             <!-- Schedule Management Section -->
             <section class="portal-section">
                 <div class="section-header">
-                    <h3>Manage Schedule Events</h3>
-                    <span class="sub-text">Add, edit, or subtract events</span>
+                    <h3>Manage Main Quest Steps</h3>
+                    <span class="sub-text">Add, edit, or remove main quest tasks</span>
                 </div>
                 <div id="parent-event-list" class="parent-event-list">
                     <!-- Parent event management items injected here -->
@@ -221,7 +224,7 @@
     <div id="event-modal" class="modal-overlay hidden">
         <div class="modal-card glass-panel">
             <div class="modal-header">
-                <h3 id="event-modal-title">Add New Scheduled Event</h3>
+                <h3 id="event-modal-title">Add New Main Quest Step</h3>
                 <button class="close-modal-btn" id="close-event-modal">&times;</button>
             </div>
             <form id="event-form" class="modal-body">
@@ -242,6 +245,16 @@
                         <label for="event-time-input">Target Time (Optional):</label>
                         <input type="time" id="event-time-input">
                     </div>
+                </div>
+                
+                <div class="input-group">
+                    <label for="event-rank-select">Rank Requirement:</label>
+                    <select id="event-rank-select" class="custom-select">
+                        <option value="Novice">Novice</option>
+                        <option value="Veteran">Veteran</option>
+                        <option value="Master">Master</option>
+                        <option value="Prestige">Prestige</option>
+                    </select>
                 </div>
 
                 <div class="input-group">

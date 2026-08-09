@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
             basePoints: 5,
             targetTime: '08:00',
             penaltyPerHour: 1,
+            levelRequired: 'Novice',
             completed: false,
             pointsEarned: 0,
             completedAt: null
@@ -17,6 +18,7 @@ document.addEventListener('DOMContentLoaded', () => {
             basePoints: 5,
             targetTime: null,
             penaltyPerHour: 0,
+            levelRequired: 'Novice',
             completed: false,
             pointsEarned: 0,
             completedAt: null
@@ -27,6 +29,7 @@ document.addEventListener('DOMContentLoaded', () => {
             basePoints: 5,
             targetTime: null,
             penaltyPerHour: 0,
+            levelRequired: 'Novice',
             completed: false,
             pointsEarned: 0,
             completedAt: null
@@ -65,6 +68,8 @@ document.addEventListener('DOMContentLoaded', () => {
         score: 0,
         weeklyScore: 0,
         allTimeScore: 0,
+        currentRank: 'Novice',
+        completedDaysThisWeek: 0,
         parentPassword: '1234',
         isParentUnlocked: false,
         lastResetDate: new Date().toDateString(),
@@ -180,6 +185,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!state.parentPassword) state.parentPassword = '1234';
                 if (typeof state.weeklyScore !== 'number') state.weeklyScore = 0;
                 if (typeof state.allTimeScore !== 'number') state.allTimeScore = 0;
+                if (!state.currentRank) state.currentRank = 'Novice';
+                if (typeof state.completedDaysThisWeek !== 'number') state.completedDaysThisWeek = 0;
             } catch (e) {
                 console.error("Failed to parse saved state:", e);
             }
@@ -194,6 +201,8 @@ document.addEventListener('DOMContentLoaded', () => {
             score: state.score,
             weeklyScore: state.weeklyScore,
             allTimeScore: state.allTimeScore,
+            currentRank: state.currentRank,
+            completedDaysThisWeek: state.completedDaysThisWeek,
             parentPassword: state.parentPassword,
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
@@ -254,18 +263,40 @@ document.addEventListener('DOMContentLoaded', () => {
         return monday1.getTime() !== monday2.getTime();
     }
 
+    // Helper to get rank numeric value
+    function getRankValue(rank) {
+        const ranks = { 'Novice': 1, 'Veteran': 2, 'Master': 3, 'Prestige': 4 };
+        return ranks[rank] || 1;
+    }
+
     // Reset daily tasks & side quests if a new day has started
     function checkDailyReset() {
         const todayStr = new Date().toDateString();
         if (state.lastResetDate !== todayStr) {
             const previousScore = state.score || 0;
             
+            // Check if all active main quest tasks were completed yesterday
+            const currentRankVal = getRankValue(state.currentRank || 'Novice');
+            const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
+            const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+            
+            if (allTasksCompleted) {
+                state.completedDaysThisWeek = (state.completedDaysThisWeek || 0) + 1;
+            }
+
             // Add previous day's score to all-time
             state.allTimeScore = (state.allTimeScore || 0) + previousScore;
             
             // Check for new week
             if (isDifferentWeek(state.lastResetDate, todayStr)) {
                 state.weeklyScore = 0; // Fresh week, it doesn't include yesterday
+                
+                // Level up if consistency was met
+                if (state.completedDaysThisWeek >= 7) {
+                    const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
+                    state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
+                }
+                state.completedDaysThisWeek = 0;
             } else {
                 state.weeklyScore = (state.weeklyScore || 0) + previousScore;
             }
@@ -389,14 +420,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Render Kid View Schedule
     function renderScheduleTasks() {
         taskListEl.innerHTML = '';
-        kidTaskCountEl.textContent = `${state.tasks.length} Event${state.tasks.length !== 1 ? 's' : ''}`;
+        
+        const currentRankVal = getRankValue(state.currentRank || 'Novice');
+        const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
 
-        if (state.tasks.length === 0) {
-            taskListEl.innerHTML = `<div class="empty-state">No scheduled events yet. Ask a parent to add events!</div>`;
+        kidTaskCountEl.textContent = `${activeTasks.length} Step${activeTasks.length !== 1 ? 's' : ''}`;
+
+        if (activeTasks.length === 0) {
+            taskListEl.innerHTML = `<div class="empty-state">No main quest steps available. Ask a parent to add tasks!</div>`;
             return;
         }
 
-        state.tasks.forEach(task => {
+        activeTasks.forEach(task => {
             const card = document.createElement('div');
             card.className = `task-card ${task.completed ? 'completed' : ''}`;
 
@@ -585,6 +620,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="parent-event-info">
                     <div class="parent-event-title">${task.title}</div>
                     <div class="parent-event-meta">
+                        <span class="event-tag">${task.levelRequired || 'Novice'}</span>
                         <span class="event-tag">${task.basePoints} pts</span>
                         <span class="event-tag">⏰ ${timeDisplay}</span>
                         <span class="event-tag">${penaltyDisplay}</span>
@@ -798,6 +834,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const currentDisplayed = parseInt(totalScoreEl.textContent, 10);
         const target = state.score;
 
+        // Apply rank crest CSS class
+        const scoreCircle = document.querySelector('.score-circle');
+        if (scoreCircle) {
+            scoreCircle.classList.remove('crest-veteran', 'crest-master', 'crest-prestige');
+            if (state.currentRank === 'Veteran') scoreCircle.classList.add('crest-veteran');
+            else if (state.currentRank === 'Master') scoreCircle.classList.add('crest-master');
+            else if (state.currentRank === 'Prestige') scoreCircle.classList.add('crest-prestige');
+        }
+
+        const badgeEl = document.getElementById('current-rank-badge');
+        if (badgeEl) {
+            badgeEl.className = `badge-rank ${state.currentRank.toLowerCase()}`;
+            badgeEl.textContent = state.currentRank;
+        }
+
         if (currentDisplayed !== target) {
             totalScoreEl.textContent = target;
             parentTotalScoreEl.textContent = target;
@@ -894,23 +945,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event Modal Functions
     function openAddEventModal() {
-        if (eventModalTitle) eventModalTitle.textContent = 'Add New Scheduled Event';
+        if (eventModalTitle) eventModalTitle.textContent = 'Add New Main Quest Step';
         eventEditIdInput.value = '';
         eventTitleInput.value = '';
         eventPointsInput.value = '5';
         eventTimeInput.value = '';
         eventPenaltyInput.value = '1';
+        const rankSelect = document.getElementById('event-rank-select');
+        if (rankSelect) rankSelect.value = 'Novice';
         eventModal.classList.remove('hidden');
         setTimeout(() => eventTitleInput.focus(), 100);
     }
 
     function openEditEventModal(task) {
-        if (eventModalTitle) eventModalTitle.textContent = 'Edit Scheduled Event';
+        if (eventModalTitle) eventModalTitle.textContent = 'Edit Main Quest Step';
         eventEditIdInput.value = task.id;
         eventTitleInput.value = task.title;
         eventPointsInput.value = task.basePoints;
         eventTimeInput.value = task.targetTime || '';
         eventPenaltyInput.value = task.penaltyPerHour;
+        const rankSelect = document.getElementById('event-rank-select');
+        if (rankSelect) rankSelect.value = task.levelRequired || 'Novice';
         eventModal.classList.remove('hidden');
         setTimeout(() => eventTitleInput.focus(), 100);
     }
@@ -1100,6 +1155,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const basePoints = parseInt(eventPointsInput.value, 10) || 0;
             const targetTime = eventTimeInput.value || null;
             const penaltyPerHour = parseInt(eventPenaltyInput.value, 10) || 0;
+            const rankSelect = document.getElementById('event-rank-select');
+            const levelRequired = rankSelect ? rankSelect.value : 'Novice';
 
             if (!title) return;
 
@@ -1111,6 +1168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     task.basePoints = basePoints;
                     task.targetTime = targetTime;
                     task.penaltyPerHour = penaltyPerHour;
+                    task.levelRequired = levelRequired;
                 }
             } else {
                 // Add new task
@@ -1120,6 +1178,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     basePoints,
                     targetTime,
                     penaltyPerHour,
+                    levelRequired,
                     completed: false,
                     pointsEarned: 0,
                     completedAt: null

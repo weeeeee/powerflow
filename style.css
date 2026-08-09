@@ -96,6 +96,7 @@ body {
     align-items: center;
     position: relative;
     box-shadow: 0 0 30px rgba(59, 130, 246, 0.3);
+    transition: all 0.5s ease;
 }
 
 .score-circle::before {
@@ -105,7 +106,62 @@ body {
     border-radius: 50%;
     background: var(--bg-color);
     z-index: 1;
+    transition: all 0.5s ease;
 }
+
+/* Rank Crest Overrides */
+.score-circle.crest-veteran {
+    border-radius: 20%;
+    transform: rotate(45deg);
+    background: linear-gradient(135deg, #10b981, #3b82f6);
+    box-shadow: 0 0 40px rgba(16, 185, 129, 0.4);
+}
+.score-circle.crest-veteran::before {
+    border-radius: 20%;
+}
+.score-circle.crest-veteran > * {
+    transform: rotate(-45deg); /* Counter-rotate content */
+}
+
+.score-circle.crest-master {
+    border-radius: 10px 10px 50px 50px;
+    background: linear-gradient(135deg, #f59e0b, #ef4444);
+    box-shadow: 0 0 40px rgba(245, 158, 11, 0.4);
+}
+.score-circle.crest-master::before {
+    border-radius: 8px 8px 48px 48px;
+}
+
+.score-circle.crest-prestige {
+    border-radius: 0;
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    background: linear-gradient(135deg, #8b5cf6, #ec4899);
+    box-shadow: 0 0 50px rgba(139, 92, 246, 0.6);
+}
+.score-circle.crest-prestige::before {
+    border-radius: 0;
+    clip-path: polygon(50% 2%, 98% 26%, 98% 74%, 50% 98%, 2% 74%, 2% 26%);
+}
+
+.current-rank-display {
+    margin-top: 1rem;
+    z-index: 2;
+}
+
+.badge-rank {
+    padding: 0.25rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+.badge-rank.novice { background: rgba(255, 255, 255, 0.1); color: var(--text-primary); border: 1px solid var(--text-secondary); }
+.badge-rank.veteran { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid #10b981; }
+.badge-rank.master { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid #f59e0b; }
+.badge-rank.prestige { background: rgba(139, 92, 246, 0.2); color: #c084fc; border: 1px solid #8b5cf6; }
 
 #total-score, #store-total-score {
     font-size: 3.5rem;
