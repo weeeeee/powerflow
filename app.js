@@ -591,16 +591,47 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="parent-event-actions">
+                    <button class="btn-icon move-up-btn" title="Move Up">⬆️</button>
+                    <button class="btn-icon move-down-btn" title="Move Down">⬇️</button>
                     <button class="btn-icon edit-quest-btn" title="Edit Side Quest">✏️</button>
                     <button class="btn-danger subtract-quest-btn" title="Delete Side Quest">➖ Delete</button>
                 </div>
             `;
 
+            card.querySelector('.move-up-btn').addEventListener('click', () => moveItem('sideQuests', quest.id, -1));
+            card.querySelector('.move-down-btn').addEventListener('click', () => moveItem('sideQuests', quest.id, 1));
             card.querySelector('.edit-quest-btn').addEventListener('click', () => openEditQuestModal(quest));
             card.querySelector('.subtract-quest-btn').addEventListener('click', () => deleteQuest(quest.id));
 
             parentQuestListEl.appendChild(card);
         });
+    }
+
+    // Move item up or down in its array
+    function moveItem(arrayName, itemId, direction) {
+        const arr = state[arrayName];
+        if (!arr) return;
+        const index = arr.findIndex(item => item.id === itemId);
+        if (index < 0) return;
+        
+        const newIndex = index + direction;
+        if (newIndex < 0 || newIndex >= arr.length) return;
+        
+        const temp = arr[index];
+        arr[index] = arr[newIndex];
+        arr[newIndex] = temp;
+        
+        saveState();
+        if (arrayName === 'tasks') {
+            renderScheduleTasks();
+            renderParentEventList();
+        } else if (arrayName === 'sideQuests') {
+            renderSideQuests();
+            renderParentQuestList();
+        } else if (arrayName === 'storeItems') {
+            renderStore();
+            renderParentStoreList();
+        }
     }
 
     // Render Parent Schedule Management List (With Add / Subtract controls)
@@ -631,10 +662,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="parent-event-actions">
+                    <button class="btn-icon move-up-btn" title="Move Up">⬆️</button>
+                    <button class="btn-icon move-down-btn" title="Move Down">⬇️</button>
                     <button class="btn-icon edit-event-btn" title="Edit Event">✏️</button>
                     <button class="btn-danger subtract-event-btn" title="Subtract/Remove Event">➖ Delete</button>
                 </div>
             `;
+
+            card.querySelector('.move-up-btn').addEventListener('click', () => moveItem('tasks', task.id, -1));
+            card.querySelector('.move-down-btn').addEventListener('click', () => moveItem('tasks', task.id, 1));
 
             // Edit Event Event Listener
             card.querySelector('.edit-event-btn').addEventListener('click', () => openEditEventModal(task));
@@ -777,11 +813,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </div>
                 <div class="parent-event-actions">
+                    <button class="btn-icon move-up-btn" title="Move Up">⬆️</button>
+                    <button class="btn-icon move-down-btn" title="Move Down">⬇️</button>
                     <button class="btn-icon edit-store-btn" title="Edit Store Item">✏️</button>
                     <button class="btn-danger delete-store-btn" title="Delete Store Item">➖ Delete</button>
                 </div>
             `;
 
+            card.querySelector('.move-up-btn').addEventListener('click', () => moveItem('storeItems', item.id, -1));
+            card.querySelector('.move-down-btn').addEventListener('click', () => moveItem('storeItems', item.id, 1));
             card.querySelector('.edit-store-btn').addEventListener('click', () => openEditStoreModal(item));
             card.querySelector('.delete-store-btn').addEventListener('click', () => deleteStoreItem(item.id));
 
