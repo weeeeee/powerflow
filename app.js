@@ -1,3 +1,19 @@
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
+  authDomain: "powerflowadhd.firebaseapp.com",
+  projectId: "powerflowadhd",
+  storageBucket: "powerflowadhd.firebasestorage.app",
+  messagingSenderId: "173956659319",
+  appId: "1:173956659319:web:3d07d6df6af776aedc2e72",
+  measurementId: "G-29F7SNRZ77"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
 document.addEventListener('DOMContentLoaded', () => {
     // Default initial tasks if none exist in localStorage
     const defaultTasks = [
@@ -158,25 +174,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Application
     function init() {
-        loadState();
-        checkDailyReset();
-        recalculateTotalScore();
-        renderDate();
-        renderScheduleTasks();
-        renderSideQuests();
-        renderStore();
-        renderParentPortal();
-        updateScoreDisplays();
-        startLiveClock();
-        setupEventListeners();
-    }
-
-    // Load state from local storage
-    function loadState() {
-        const savedState = localStorage.getItem('powerflow_state');
-        if (savedState) {
-            try {
-                const parsed = JSON.parse(savedState);
+        // Listen to Firestore for real-time state changes
+        onSnapshot(doc(db, "users", "defaultFamily"), (docSnap) => {
+            if (docSnap.exists()) {
+                const parsed = docSnap.data();
                 state = { ...state, ...parsed };
                 // Ensure arrays exist
                 if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
@@ -188,15 +189,43 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof state.allTimeScore !== 'number') state.allTimeScore = 0;
                 if (!state.currentRank) state.currentRank = 'Novice';
                 if (typeof state.completedDaysThisWeek !== 'number') state.completedDaysThisWeek = 0;
-            } catch (e) {
-                console.error("Failed to parse saved state:", e);
+            } else {
+                // Initial creation / migration from localStorage
+                const localState = localStorage.getItem('powerflow_state');
+                if (localState) {
+                    try {
+                        const parsed = JSON.parse(localState);
+                        state = { ...state, ...parsed };
+                        if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
+                        if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
+                        if (!Array.isArray(state.storeItems)) state.storeItems = defaultStoreItems;
+                        if (!Array.isArray(state.adjustments)) state.adjustments = [];
+                        if (!state.parentPassword) state.parentPassword = '1234';
+                    } catch (e) {
+                        console.error("Failed to parse local state:", e);
+                    }
+                }
+                saveState(); // push initial state to firestore
             }
-        }
-        // Always lock portal on fresh session load
-        state.isParentUnlocked = false;
+            
+            // Re-render UI with new state
+            checkDailyReset();
+            recalculateTotalScore();
+            renderDate();
+            renderScheduleTasks();
+            renderSideQuests();
+            renderStore();
+            renderParentPortal();
+            if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
+        }, (error) => {
+            console.error("Firebase listen error:", error);
+        });
+
+        startLiveClock();
+        setupEventListeners();
     }
 
-    // Save state to local storage
+    // Save state to Firestore
     function saveState() {
         const stateToSave = {
             score: state.score,
@@ -211,6 +240,12 @@ document.addEventListener('DOMContentLoaded', () => {
             storeItems: state.storeItems,
             adjustments: state.adjustments
         };
+        
+        setDoc(doc(db, "users", "defaultFamily"), stateToSave).catch(err => {
+            console.error("Error saving state to Firestore:", err);
+        });
+        
+        // Also backup to local storage just in case
         localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
     }
 
