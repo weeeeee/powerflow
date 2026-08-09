@@ -36,13 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     ];
 
-    // Default initial side quests
     const defaultSideQuests = [
         {
             id: 'sq-1',
             title: 'Organize Bedroom Toys',
             points: 10,
             category: 'Chores',
+            notes: 'Make sure all toys are in the bin.',
             completed: false,
             completedAt: null
         },
@@ -51,6 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
             title: 'Read Extra 15 Mins',
             points: 15,
             category: 'Learning',
+            notes: '',
             completed: false,
             completedAt: null
         }
@@ -527,6 +528,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="task-info">
                     <div class="task-title">${icon} ${quest.title}</div>
+                    ${quest.notes ? `<div class="task-notes" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">${quest.notes}</div>` : ''}
                     <div class="task-meta">
                         <span class="quest-points-badge">+${quest.points} Bonus Pts</span>
                         <span class="event-tag">${quest.category || 'Custom'}</span>
@@ -581,6 +583,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.innerHTML = `
                 <div class="parent-event-info">
                     <div class="parent-event-title">${icon} ${quest.title}</div>
+                    ${quest.notes ? `<div class="parent-event-notes" style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">${quest.notes}</div>` : ''}
                     <div class="parent-event-meta">
                         <span class="quest-points-badge">+${quest.points} pts</span>
                         <span class="event-tag">${quest.category || 'Custom'}</span>
@@ -1011,6 +1014,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const questTitleInput = document.getElementById('quest-title-input');
         const questPointsInput = document.getElementById('quest-points-input');
         const questCategorySelect = document.getElementById('quest-category-select');
+        const questNotesInput = document.getElementById('quest-notes-input');
         const sideQuestModal = document.getElementById('sidequest-modal');
 
         if (!sideQuestModal) return;
@@ -1020,6 +1024,7 @@ document.addEventListener('DOMContentLoaded', () => {
         questTitleInput.value = '';
         questPointsInput.value = '10';
         questCategorySelect.value = 'Chores';
+        if (questNotesInput) questNotesInput.value = '';
         sideQuestModal.classList.remove('hidden');
         setTimeout(() => questTitleInput.focus(), 100);
     }
@@ -1030,6 +1035,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const questTitleInput = document.getElementById('quest-title-input');
         const questPointsInput = document.getElementById('quest-points-input');
         const questCategorySelect = document.getElementById('quest-category-select');
+        const questNotesInput = document.getElementById('quest-notes-input');
         const sideQuestModal = document.getElementById('sidequest-modal');
 
         if (!sideQuestModal) return;
@@ -1039,6 +1045,7 @@ document.addEventListener('DOMContentLoaded', () => {
         questTitleInput.value = quest.title;
         questPointsInput.value = quest.points;
         questCategorySelect.value = quest.category || 'Chores';
+        if (questNotesInput) questNotesInput.value = quest.notes || '';
         sideQuestModal.classList.remove('hidden');
         setTimeout(() => questTitleInput.focus(), 100);
     }
@@ -1212,6 +1219,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const title = document.getElementById('quest-title-input').value.trim();
                 const points = parseInt(document.getElementById('quest-points-input').value, 10) || 10;
                 const category = document.getElementById('quest-category-select').value;
+                const notesInput = document.getElementById('quest-notes-input');
+                const notes = notesInput ? notesInput.value.trim() : '';
 
                 if (!title) return;
 
@@ -1223,6 +1232,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         quest.title = title;
                         quest.points = points;
                         quest.category = category;
+                        quest.notes = notes;
                     }
                 } else {
                     const newQuest = {
@@ -1230,6 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         title,
                         points,
                         category,
+                        notes,
                         completed: false,
                         completedAt: null
                     };
@@ -1255,10 +1266,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 const titleInput = document.getElementById('quest-title-input');
                 const pointsInput = document.getElementById('quest-points-input');
                 const categorySelect = document.getElementById('quest-category-select');
+                const notesInput = document.getElementById('quest-notes-input');
 
                 if (titleInput && title) titleInput.value = title;
                 if (pointsInput && pts) pointsInput.value = pts;
                 if (categorySelect && cat) categorySelect.value = cat;
+                if (notesInput) notesInput.value = '';
             });
         });
 
