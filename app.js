@@ -109,8 +109,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const currentDateEl = document.getElementById('current-date');
     const taskListEl = document.getElementById('task-list');
     const kidTaskCountEl = document.getElementById('kid-task-count');
-    const simulateTimeInput = document.getElementById('simulate-time');
-    const resetBtn = document.getElementById('reset-btn');
     const liveTimeEl = document.getElementById('live-time');
 
     // DOM Elements - Kid Store View
@@ -429,12 +427,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!task) return;
 
         if (!task.completed) {
-            const timeVal = simulateTimeInput.value;
-            let completedTimeStr = timeVal;
-            if (!completedTimeStr) {
-                const now = new Date();
-                completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            }
+            const now = new Date();
+            let completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
             const earned = calculatePoints(task, completedTimeStr);
             task.completed = true;
@@ -518,12 +512,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!quest) return;
 
         if (!quest.completed) {
-            const timeVal = simulateTimeInput ? simulateTimeInput.value : '';
-            let completedTimeStr = timeVal;
-            if (!completedTimeStr) {
-                const now = new Date();
-                completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            }
+            const now = new Date();
+            let completedTimeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
             quest.completed = true;
             quest.completedAt = completedTimeStr;
         } else {
@@ -1414,28 +1404,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeChangePassModalBtn.addEventListener('click', closeChangePassModal);
         cancelChangePassBtn.addEventListener('click', closeChangePassModal);
 
-        // Reset Day Button (Kid View)
-        resetBtn.addEventListener('click', () => {
-            if (confirm("Are you sure you want to reset today's task completions?")) {
-                state.tasks.forEach(t => {
-                    t.completed = false;
-                    t.pointsEarned = 0;
-                    t.completedAt = null;
-                });
-                if (Array.isArray(state.sideQuests)) {
-                    state.sideQuests.forEach(q => {
-                        q.completed = false;
-                        q.completedAt = null;
-                    });
-                }
-                recalculateTotalScore();
-                saveState();
-                renderScheduleTasks();
-                renderSideQuests();
-                renderParentPortal();
-                updateScoreDisplays();
-            }
-        });
+
     }
 
     // Run Initialization

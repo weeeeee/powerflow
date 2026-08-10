@@ -327,34 +327,7 @@ body {
     opacity: 1;
 }
 
-.test-controls {
-    margin-top: 3rem;
-    padding-top: 1.5rem;
-    border-top: 1px dashed var(--glass-border);
-    display: flex;
-    flex-direction: column;
-    gap: 0.5rem;
-}
 
-.test-controls h3 {
-    font-size: 1rem;
-    color: var(--text-secondary);
-    margin-bottom: 0.5rem;
-}
-
-.test-controls label {
-    font-size: 0.85rem;
-    color: var(--text-secondary);
-}
-
-.test-controls input {
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid var(--glass-border);
-    color: var(--text-primary);
-    padding: 0.5rem;
-    border-radius: 8px;
-    font-family: inherit;
-}
 
 .btn-secondary {
     background: rgba(255, 255, 255, 0.1);
@@ -695,16 +668,7 @@ body {
     color: var(--danger-color);
 }
 
-/* Test Controls improvement */
-.test-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
 
-.test-row input[type="time"] {
-    flex: 1;
-}
 
 /* Modal Overlays & Cards */
 .modal-overlay {
