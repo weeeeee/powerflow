@@ -274,7 +274,16 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        state.score = Math.max(0, taskScore + questScore + adjScore);
+        let mainQuestBonus = 0;
+        const currentRankVal = getRankValue(state.currentRank || 'Novice');
+        const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
+        const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+        
+        if (allTasksCompleted) {
+            mainQuestBonus = 200;
+        }
+
+        state.score = Math.max(0, taskScore + questScore + adjScore + mainQuestBonus);
     }
 
     // Helper to check if two dates are in different weeks (using Monday as start of week)
@@ -493,6 +502,17 @@ document.addEventListener('DOMContentLoaded', () => {
             card.querySelector('.complete-btn').addEventListener('click', () => toggleTask(task.id));
             taskListEl.appendChild(card);
         });
+
+        const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+        if (allTasksCompleted) {
+            const completionMsg = document.createElement('div');
+            completionMsg.className = 'empty-state';
+            completionMsg.style.color = 'var(--success-color, #10b981)';
+            completionMsg.style.fontWeight = 'bold';
+            completionMsg.style.marginTop = '1rem';
+            completionMsg.innerHTML = '🎉 Main Quest Completed! +200 Bonus Points 🎉';
+            taskListEl.appendChild(completionMsg);
+        }
     }
 
     // Helper icon getter for categories
