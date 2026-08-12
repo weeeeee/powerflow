@@ -129,6 +129,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const parentStoreListEl = document.getElementById('parent-store-list');
     const pointsHistoryListEl = document.getElementById('points-history-list');
 
+    // DOM Elements - Calendar
+    const openCalendarBtn = document.getElementById('open-calendar-btn');
+    const calendarModal = document.getElementById('calendar-modal');
+    const closeCalendarModalBtn = document.getElementById('close-calendar-modal');
+    const calendarGrid = document.getElementById('calendar-grid');
+    const calendarMonthYear = document.getElementById('calendar-month-year');
+    const calPrevMonthBtn = document.getElementById('cal-prev-month');
+    const calNextMonthBtn = document.getElementById('cal-next-month');
+    
+    // DOM Elements - Historical Day Detail
+    const dayDetailModal = document.getElementById('day-detail-modal');
+    const closeDayDetailModalBtn = document.getElementById('close-day-detail-modal');
+    const backToCalendarBtn = document.getElementById('back-to-calendar-btn');
+    const dayDetailTitle = document.getElementById('day-detail-title');
+    const dayDetailRank = document.getElementById('day-detail-rank');
+    const dayDetailTasks = document.getElementById('day-detail-tasks');
+    const dayDetailQuests = document.getElementById('day-detail-quests');
+
     // DOM Elements - Modals & Forms
     const passwordModal = document.getElementById('password-modal');
     const passwordForm = document.getElementById('password-form');
@@ -197,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
                 if (!Array.isArray(state.storeItems)) state.storeItems = defaultStoreItems;
                 if (!Array.isArray(state.adjustments)) state.adjustments = [];
+                if (!state.history) state.history = {}; // Initialize history log
                 if (!state.parentPassword) state.parentPassword = '1234';
                 if (typeof state.weeklyScore !== 'number') state.weeklyScore = 0;
                 if (typeof state.allTimeScore !== 'number') state.allTimeScore = 0;
@@ -213,6 +232,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
                         if (!Array.isArray(state.storeItems)) state.storeItems = defaultStoreItems;
                         if (!Array.isArray(state.adjustments)) state.adjustments = [];
+                        if (!state.history) state.history = {}; // Initialize history log
                         if (!state.parentPassword) state.parentPassword = '1234';
                     } catch (e) {
                         console.error("Failed to parse local state:", e);
@@ -253,6 +273,7 @@ document.addEventListener('DOMContentLoaded', () => {
             sideQuests: state.sideQuests,
             storeItems: state.storeItems,
             adjustments: state.adjustments,
+            history: state.history || {},
             lastModified: state.lastModified
         };
         
@@ -292,6 +313,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         state.score = Math.max(0, taskScore + questScore + adjScore);
+        
+        saveDailySnapshot();
+    }
+
+    // Save a snapshot of the current day's progress
+    function saveDailySnapshot() {
+        if (!state.history) state.history = {};
+        const todayStr = new Date().toDateString();
+        
+        // Don't overwrite if checkDailyReset is currently processing a new day and hasn't updated lastResetDate yet
+        if (state.lastResetDate !== todayStr) return; 
+
+        state.history[todayStr] = {
+            date: todayStr,
+            score: state.score,
+            rank: state.currentRank,
+            tasks: JSON.parse(JSON.stringify(state.tasks)),
+            sideQuests: JSON.parse(JSON.stringify(state.sideQuests || []))
+        };
     }
 
     // Helper to check if two dates are in different weeks (using Monday as start of week)
@@ -361,6 +401,16 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 state.weeklyScore = (state.weeklyScore || 0) + previousScore;
             }
+
+            // Save final snapshot of yesterday before clearing
+            if (!state.history) state.history = {};
+            state.history[state.lastResetDate] = {
+                date: state.lastResetDate,
+                score: previousScore,
+                rank: state.currentRank,
+                tasks: JSON.parse(JSON.stringify(state.tasks)),
+                sideQuests: JSON.parse(JSON.stringify(state.sideQuests || []))
+            };
 
             state.lastResetDate = todayStr;
             state.tasks.forEach(t => {
@@ -1446,7 +1496,286 @@ document.addEventListener('DOMContentLoaded', () => {
         closeChangePassModalBtn.addEventListener('click', closeChangePassModal);
         cancelChangePassBtn.addEventListener('click', closeChangePassModal);
 
+        // Calendar Event Listeners
+        openCalendarBtn.addEventListener('click', openCalendarModal);
+        closeCalendarModalBtn.addEventListener('click', closeCalendarModal);
+        calPrevMonthBtn.addEventListener('click', () => changeMonth(-1));
+        calNextMonthBtn.addEventListener('click', () => changeMonth(1));
+        
+        closeDayDetailModalBtn.addEventListener('click', closeDayDetailModal);
+        backToCalendarBtn.addEventListener('click', () => {
+            closeDayDetailModal();
+            openCalendarModal();
+        });
 
+    }
+
+    // --- Historical Calendar Logic ---
+    let currentCalendarDate = new Date();
+
+    function openCalendarModal() {
+        calendarModal.classList.remove('hidden');
+        renderCalendar();
+    }
+
+    function closeCalendarModal() {
+        calendarModal.classList.add('hidden');
+    }
+
+    function changeMonth(direction) {
+        currentCalendarDate.setMonth(currentCalendarDate.getMonth() + direction);
+        renderCalendar();
+    }
+
+    function renderCalendar() {
+        const year = currentCalendarDate.getFullYear();
+        const month = currentCalendarDate.getMonth();
+        
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        calendarMonthYear.textContent = `${monthNames[month]} ${year}`;
+        
+        calendarGrid.innerHTML = '';
+        
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        
+        // Blank days before start of month
+        for (let i = 0; i < firstDayOfMonth; i++) {
+            const emptyDiv = document.createElement('div');
+            emptyDiv.className = 'calendar-day empty';
+            calendarGrid.appendChild(emptyDiv);
+        }
+        
+        const now = new Date();
+        now.setHours(0,0,0,0);
+        
+        for (let i = 1; i <= daysInMonth; i++) {
+            const dateObj = new Date(year, month, i);
+            const dateStr = dateObj.toDateString();
+            const dayDiv = document.createElement('div');
+            dayDiv.className = 'calendar-day';
+            
+            if (dateObj.getTime() > now.getTime()) {
+                dayDiv.classList.add('future');
+                dayDiv.innerHTML = `<span class="day-num">${i}</span>`;
+            } else {
+                const historyData = state.history && state.history[dateStr];
+                
+                dayDiv.innerHTML = `<span class="day-num">${i}</span>`;
+                if (historyData) {
+                    dayDiv.innerHTML += `<span class="day-points">${historyData.score} pts</span>`;
+                    
+                    // Check if perfect day (all main quests completed)
+                    const activeTasks = (historyData.tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= getRankValue(historyData.rank || 'Novice'));
+                    if (activeTasks.length > 0 && activeTasks.every(t => t.completed)) {
+                        dayDiv.classList.add('perfect-day');
+                    }
+                    
+                    dayDiv.addEventListener('click', () => {
+                        openDayDetailModal(dateStr, historyData);
+                    });
+                } else {
+                    dayDiv.addEventListener('click', () => {
+                        // Empty data modal
+                        openDayDetailModal(dateStr, { score: 0, rank: 'Novice', tasks: [], sideQuests: [], date: dateStr });
+                    });
+                }
+            }
+            
+            calendarGrid.appendChild(dayDiv);
+        }
+    }
+
+    let currentDetailDate = null;
+    
+    function openDayDetailModal(dateStr, data) {
+        closeCalendarModal();
+        currentDetailDate = dateStr;
+        dayDetailModal.classList.remove('hidden');
+        
+        dayDetailTitle.textContent = dateStr;
+        
+        // Set rank badge class dynamically
+        dayDetailRank.textContent = data.rank || 'Novice';
+        dayDetailRank.className = `badge-rank ${(data.rank || 'Novice').toLowerCase()}`;
+        
+        // Render Tasks
+        dayDetailTasks.innerHTML = '';
+        if (!data.tasks || data.tasks.length === 0) {
+            dayDetailTasks.innerHTML = '<div class="empty-state">No tasks recorded for this day.</div>';
+        } else {
+            data.tasks.forEach(task => {
+                const card = document.createElement('div');
+                card.className = 'historical-task-card';
+                card.innerHTML = `
+                    <div class="historical-task-info">
+                        <span class="historical-task-title">${task.title}</span>
+                        <span class="task-meta">${task.completed ? task.pointsEarned : 0} / ${task.basePoints} pts</span>
+                    </div>
+                    <div class="historical-task-actions">
+                        ${task.completed ? `<input type="time" class="historical-time-input" value="${task.completedAt || ''}" data-id="${task.id}" data-type="task">` : ''}
+                        <input type="checkbox" class="historical-checkbox" data-id="${task.id}" data-type="task" ${task.completed ? 'checked' : ''}>
+                    </div>
+                `;
+                dayDetailTasks.appendChild(card);
+            });
+        }
+        
+        // Render Quests
+        dayDetailQuests.innerHTML = '';
+        if (!data.sideQuests || data.sideQuests.length === 0) {
+            dayDetailQuests.innerHTML = '<div class="empty-state">No side quests recorded for this day.</div>';
+        } else {
+            data.sideQuests.forEach(quest => {
+                const card = document.createElement('div');
+                card.className = 'historical-task-card';
+                card.innerHTML = `
+                    <div class="historical-task-info">
+                        <span class="historical-task-title">${getCategoryIcon(quest.category)} ${quest.title}</span>
+                        <span class="task-meta">+${quest.points} pts</span>
+                    </div>
+                    <div class="historical-task-actions">
+                        ${quest.completed ? `<input type="time" class="historical-time-input" value="${quest.completedAt || ''}" data-id="${quest.id}" data-type="quest">` : ''}
+                        <input type="checkbox" class="historical-checkbox" data-id="${quest.id}" data-type="quest" ${quest.completed ? 'checked' : ''}>
+                    </div>
+                `;
+                dayDetailQuests.appendChild(card);
+            });
+        }
+        
+        // Add Event Listeners for editing
+        document.querySelectorAll('.historical-checkbox').forEach(cb => {
+            cb.addEventListener('change', (e) => {
+                toggleHistoricalTask(currentDetailDate, e.target.getAttribute('data-id'), e.target.getAttribute('data-type'), e.target.checked);
+            });
+        });
+        
+        document.querySelectorAll('.historical-time-input').forEach(inp => {
+            inp.addEventListener('change', (e) => {
+                updateHistoricalTime(currentDetailDate, e.target.getAttribute('data-id'), e.target.getAttribute('data-type'), e.target.value);
+            });
+        });
+    }
+
+    function closeDayDetailModal() {
+        dayDetailModal.classList.add('hidden');
+        currentDetailDate = null;
+    }
+
+    function toggleHistoricalTask(dateStr, id, type, isCompleted) {
+        if (!state.history) state.history = {};
+        
+        // If they click on a day that previously had no history, generate a dummy history based on current templates
+        if (!state.history[dateStr]) {
+            state.history[dateStr] = {
+                date: dateStr,
+                score: 0,
+                rank: state.currentRank || 'Novice',
+                tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})),
+                sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null}))
+            };
+        }
+        
+        const data = state.history[dateStr];
+        let oldScore = data.score || 0;
+        let item = null;
+        let pointsChange = 0;
+        
+        const now = new Date();
+        const defaultTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+        
+        if (type === 'task') {
+            item = data.tasks.find(t => t.id === id);
+            if (item) {
+                if (isCompleted) {
+                    item.completed = true;
+                    item.completedAt = defaultTime;
+                    item.pointsEarned = calculatePoints(item, defaultTime);
+                    pointsChange = item.pointsEarned;
+                } else {
+                    item.completed = false;
+                    pointsChange = -(item.pointsEarned || 0);
+                    item.pointsEarned = 0;
+                    item.completedAt = null;
+                }
+            }
+        } else if (type === 'quest') {
+            item = data.sideQuests.find(q => q.id === id);
+            if (item) {
+                if (isCompleted) {
+                    item.completed = true;
+                    item.completedAt = defaultTime;
+                    pointsChange = item.points || 0;
+                } else {
+                    item.completed = false;
+                    pointsChange = -(item.points || 0);
+                    item.completedAt = null;
+                }
+            }
+        }
+        
+        data.score = Math.max(0, oldScore + pointsChange);
+        
+        // Adjust allTimeScore and update today's state if we are editing today
+        state.allTimeScore = Math.max(0, (state.allTimeScore || 0) + pointsChange);
+        
+        if (dateStr === new Date().toDateString()) {
+            if (type === 'task') {
+                const liveItem = state.tasks.find(t => t.id === id);
+                if (liveItem) {
+                    liveItem.completed = item.completed;
+                    liveItem.completedAt = item.completedAt;
+                    liveItem.pointsEarned = item.pointsEarned;
+                }
+            } else if (type === 'quest') {
+                const liveItem = state.sideQuests.find(q => q.id === id);
+                if (liveItem) {
+                    liveItem.completed = item.completed;
+                    liveItem.completedAt = item.completedAt;
+                }
+            }
+            recalculateTotalScore();
+        }
+        
+        saveState();
+        openDayDetailModal(dateStr, data); // Re-render detail
+        
+        // Render parent portal to update stats if calendar is open from there
+        renderParentPortal();
+        if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
+    }
+
+    function updateHistoricalTime(dateStr, id, type, newTime) {
+        if (!state.history || !state.history[dateStr] || type !== 'task') return;
+        const data = state.history[dateStr];
+        
+        let oldScore = data.score || 0;
+        let item = data.tasks.find(t => t.id === id);
+        
+        if (item && item.completed) {
+            const oldPoints = item.pointsEarned || 0;
+            item.completedAt = newTime;
+            item.pointsEarned = calculatePoints(item, newTime);
+            
+            const pointsChange = item.pointsEarned - oldPoints;
+            data.score = Math.max(0, oldScore + pointsChange);
+            state.allTimeScore = Math.max(0, (state.allTimeScore || 0) + pointsChange);
+            
+            if (dateStr === new Date().toDateString()) {
+                const liveItem = state.tasks.find(t => t.id === id);
+                if (liveItem) {
+                    liveItem.completedAt = item.completedAt;
+                    liveItem.pointsEarned = item.pointsEarned;
+                }
+                recalculateTotalScore();
+            }
+            
+            saveState();
+            openDayDetailModal(dateStr, data); // Re-render
+            
+            renderParentPortal();
+            if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
+        }
     }
 
     // Run Initialization

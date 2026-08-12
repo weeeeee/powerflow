@@ -1099,3 +1099,128 @@ body {
     transform: translateY(-1px);
 }
 
+/* Calendar Styles */
+.calendar-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.calendar-controls h4 {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+.calendar-header-row {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+    font-size: 0.85rem;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-day {
+    aspect-ratio: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--glass-border);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    padding: 2px;
+}
+
+.calendar-day:hover:not(.empty) {
+    background: rgba(255, 255, 255, 0.1);
+    transform: scale(1.05);
+}
+
+.calendar-day.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+}
+
+.calendar-day.future {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.calendar-day .day-num {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.calendar-day .day-points {
+    font-size: 0.75rem;
+    color: var(--accent-primary);
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.calendar-day.perfect-day {
+    border-color: rgba(16, 185, 129, 0.5);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+.calendar-day.perfect-day .day-points {
+    color: #10b981;
+}
+
+/* Editable Historical Task Styles */
+.historical-task-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 0.75rem;
+    border-radius: 10px;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--glass-border);
+}
+
+.historical-task-info {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex: 1;
+}
+
+.historical-task-title {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.historical-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.historical-checkbox {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.historical-time-input {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid var(--glass-border);
+    color: var(--text-primary);
+    padding: 0.2rem 0.5rem;
+    border-radius: 5px;
+    font-size: 0.8rem;
+    color-scheme: dark;
+}

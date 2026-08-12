@@ -134,6 +134,7 @@
                 <button id="open-add-quest-btn" class="btn-quest">⚔️ + Side Quest</button>
                 <button id="open-add-store-btn" class="btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #3b82f6);">🛒 + Store Item</button>
                 <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points</button>
+                <button id="open-calendar-btn" class="btn-secondary" style="background: var(--surface-light); color: var(--text-primary); border: 1px solid var(--border-color);">📅 History Calendar</button>
             </div>
 
             <!-- Schedule Management Section -->
@@ -435,7 +436,59 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=3"></script>
+    <!-- Modal: History Calendar -->
+    <div id="calendar-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3>Historical Monthly Calendar</h3>
+                <button class="close-modal-btn" id="close-calendar-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="calendar-controls">
+                    <button id="cal-prev-month" class="btn-icon">⬅️</button>
+                    <h4 id="calendar-month-year">August 2026</h4>
+                    <button id="cal-next-month" class="btn-icon">➡️</button>
+                </div>
+                <div class="calendar-header-row">
+                    <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+                </div>
+                <div id="calendar-grid" class="calendar-grid">
+                    <!-- Calendar days injected here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Historical Day Detail -->
+    <div id="day-detail-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel">
+            <div class="modal-header">
+                <div>
+                    <h3 id="day-detail-title">Day Log</h3>
+                    <span id="day-detail-rank" class="badge-rank novice" style="font-size: 0.8rem;">Novice</span>
+                </div>
+                <button class="close-modal-btn" id="close-day-detail-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+                <p class="hint-text">You can edit past events here. Adjustments will automatically update the all-time points.</p>
+                
+                <h4 style="margin-top: 1rem; margin-bottom: 0.5rem; color: var(--primary-color);">Main Quest</h4>
+                <div id="day-detail-tasks" class="task-list">
+                    <!-- Historical tasks injected here -->
+                </div>
+                
+                <h4 style="margin-top: 1.5rem; margin-bottom: 0.5rem; color: var(--accent-color);">Side Quests</h4>
+                <div id="day-detail-quests" class="task-list">
+                    <!-- Historical quests injected here -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="back-to-calendar-btn">Back to Calendar</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="app.js?v=4"></script>
 </body>
 </html>
 
