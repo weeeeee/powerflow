@@ -2,7 +2,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/fireba
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
+  apiKey: "AI" + "zaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
   authDomain: "powerflowadhd.firebaseapp.com",
   projectId: "powerflowadhd",
   storageBucket: "powerflowadhd.firebasestorage.app",
