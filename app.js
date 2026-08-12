@@ -274,16 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        let mainQuestBonus = 0;
-        const currentRankVal = getRankValue(state.currentRank || 'Novice');
-        const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
-        const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
-        
-        if (allTasksCompleted) {
-            mainQuestBonus = 200;
-        }
-
-        state.score = Math.max(0, taskScore + questScore + adjScore + mainQuestBonus);
+        state.score = Math.max(0, taskScore + questScore + adjScore);
     }
 
     // Helper to check if two dates are in different weeks (using Monday as start of week)
@@ -338,6 +329,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.completedDaysThisWeek >= 7) {
                     const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
                     state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
+                    
+                    const now = new Date();
+                    const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+                    state.adjustments.push({
+                        id: `adj-levelup-${Date.now()}`,
+                        type: 'add',
+                        amount: 200,
+                        reason: 'Level Up Bonus!',
+                        timestamp: timeStr
+                    });
                 }
                 state.completedDaysThisWeek = 0;
             } else {
@@ -510,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
             completionMsg.style.color = 'var(--success-color, #10b981)';
             completionMsg.style.fontWeight = 'bold';
             completionMsg.style.marginTop = '1rem';
-            completionMsg.innerHTML = '🎉 Main Quest Completed! +200 Bonus Points 🎉';
+            completionMsg.innerHTML = '🎉 Main Quest Completed For Today! 🎉';
             taskListEl.appendChild(completionMsg);
         }
     }
@@ -777,7 +778,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderStore() {
         if (!storeListEl) return;
         storeListEl.innerHTML = '';
-        if (storeTotalScoreEl) storeTotalScoreEl.textContent = state.score;
+        const totalAvailable = (state.allTimeScore || 0) + state.score;
+        if (storeTotalScoreEl) storeTotalScoreEl.textContent = totalAvailable;
         if (kidStoreCountEl) kidStoreCountEl.textContent = `${state.storeItems.length} Item${state.storeItems.length !== 1 ? 's' : ''}`;
 
         if (state.storeItems.length === 0) {
@@ -790,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             card.className = 'store-card';
             
             const isAvailable = item.isAvailable !== false;
-            const canAfford = isAvailable && state.score >= item.points;
+            const canAfford = isAvailable && totalAvailable >= item.points;
 
             card.innerHTML = `
                 <div class="store-icon">${item.icon || '🎁'}</div>
@@ -810,15 +812,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function purchaseItem(item) {
-        if (state.score < item.points) return;
+        const totalAvailable = (state.allTimeScore || 0) + state.score;
+        if (totalAvailable < item.points) return;
         
         if (confirm(`Are you sure you want to spend ${item.points} points on "${item.title}"?`)) {
             const now = new Date();
             const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 
+            state.allTimeScore = (state.allTimeScore || 0) - item.points;
+
             state.adjustments.push({
                 id: `adj-${Date.now()}`,
-                type: 'subtract',
+                type: 'spend',
                 amount: item.points,
                 reason: `Purchased: ${item.title}`,
                 timestamp: timeStr
@@ -940,7 +945,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (currentDisplayed !== target) {
             totalScoreEl.textContent = target;
             parentTotalScoreEl.textContent = target;
-            if (storeTotalScoreEl) storeTotalScoreEl.textContent = target;
 
             totalScoreEl.style.transform = 'scale(1.2)';
             setTimeout(() => {
@@ -957,6 +961,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const parentWeeklyEl = document.getElementById('parent-weekly-score');
         const parentAlltimeEl = document.getElementById('parent-alltime-score');
 
+        if (storeTotalScoreEl) storeTotalScoreEl.textContent = allTimeTotal;
         if (weeklyDisplayEl) weeklyDisplayEl.textContent = weeklyTotal;
         if (alltimeDisplayEl) alltimeDisplayEl.textContent = allTimeTotal;
         if (parentWeeklyEl) parentWeeklyEl.textContent = weeklyTotal;
