@@ -176,7 +176,22 @@ document.addEventListener('DOMContentLoaded', () => {
         onSnapshot(doc(db, "users", "defaultFamily"), (docSnap) => {
             if (docSnap.exists()) {
                 const parsed = docSnap.data();
-                state = { ...state, ...parsed };
+                
+                let bestState = parsed;
+                const localStateStr = localStorage.getItem('powerflow_state');
+                if (localStateStr) {
+                    try {
+                        const localState = JSON.parse(localStateStr);
+                        if (localState.lastModified && (!parsed.lastModified || localState.lastModified > parsed.lastModified)) {
+                            bestState = localState;
+                            setDoc(doc(db, "users", "defaultFamily"), bestState).catch(err => console.error(err));
+                        }
+                    } catch (e) {
+                        console.error(e);
+                    }
+                }
+
+                state = { ...state, ...bestState };
                 // Ensure arrays exist
                 if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
                 if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
@@ -225,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Save state to Firestore
     function saveState() {
+        state.lastModified = Date.now();
         const stateToSave = {
             score: state.score,
             weeklyScore: state.weeklyScore,
@@ -236,7 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
             tasks: state.tasks,
             sideQuests: state.sideQuests,
             storeItems: state.storeItems,
-            adjustments: state.adjustments
+            adjustments: state.adjustments,
+            lastModified: state.lastModified
         };
         
         setDoc(doc(db, "users", "defaultFamily"), stateToSave).catch(err => {
@@ -379,8 +396,8 @@ document.addEventListener('DOMContentLoaded', () => {
             h = h % 12 || 12;
             liveTimeEl.textContent = `${h}:${m}:${s} ${ampm}`;
 
-            // Check for midnight crossing while app is open
-            if (now.getHours() === 0 && now.getMinutes() === 0 && now.getSeconds() === 0) {
+            // Check for date change while app is open
+            if (state.lastResetDate && state.lastResetDate !== new Date().toDateString()) {
                 checkDailyReset();
                 renderScheduleTasks();
                 renderSideQuests();
