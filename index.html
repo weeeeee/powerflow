@@ -32,6 +32,15 @@
                 <div class="current-rank-display">
                     <span id="current-rank-badge" class="badge-rank novice">Novice</span>
                 </div>
+                <div class="level-progress-container" id="level-progress-container">
+                    <div class="level-progress-header">
+                        <span class="level-progress-label">Rank Progress</span>
+                        <span class="level-progress-text" id="level-progress-text">0/7 Days</span>
+                    </div>
+                    <div class="level-progress-bar">
+                        <div class="level-progress-fill" id="level-progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
                 <div class="long-term-stats">
                     <div class="lt-stat">
                         <span class="lt-label">This Week</span>
@@ -51,6 +60,7 @@
                     <span class="task-count-badge" id="kid-task-count">0 Steps</span>
                 </div>
                 <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 1rem; margin-top: -0.5rem;">Upgrade to the next level when completed the Main Quest for a week and earn 200 point bonus</p>
+                
                 <div id="task-list" class="task-list">
                     <!-- Tasks will be injected here by JS -->
                 </div>

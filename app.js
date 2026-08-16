@@ -195,21 +195,10 @@ document.addEventListener('DOMContentLoaded', () => {
             if (docSnap.exists()) {
                 const parsed = docSnap.data();
                 
-                let bestState = parsed;
-                const localStateStr = localStorage.getItem('powerflow_state');
-                if (localStateStr) {
-                    try {
-                        const localState = JSON.parse(localStateStr);
-                        if (localState.lastModified && (!parsed.lastModified || localState.lastModified > parsed.lastModified)) {
-                            bestState = localState;
-                            setDoc(doc(db, "users", "defaultFamily"), bestState).catch(err => console.error(err));
-                        }
-                    } catch (e) {
-                        console.error(e);
-                    }
-                }
-
-                state = { ...state, ...bestState };
+                state = { ...state, ...parsed };
+                
+                // Backup to localStorage
+                localStorage.setItem('powerflow_state', JSON.stringify(state));
                 // Ensure arrays exist
                 if (!Array.isArray(state.tasks)) state.tasks = defaultTasks;
                 if (!Array.isArray(state.sideQuests)) state.sideQuests = defaultSideQuests;
@@ -250,6 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
             renderStore();
             renderParentPortal();
             if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
+            updateRankProgressDisplay();
         }, (error) => {
             console.error("Firebase listen error:", error);
         });
@@ -283,6 +273,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Also backup to local storage just in case
         localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
+    }
+
+    // Update Rank Progress Bar Display
+    function updateRankProgressDisplay() {
+        const progressContainer = document.getElementById('level-progress-container');
+        const progressText = document.getElementById('level-progress-text');
+        const progressFill = document.getElementById('level-progress-fill');
+        
+        if (!progressContainer || !progressText || !progressFill) return;
+        
+        if (state.currentRank === 'Prestige') {
+            progressText.textContent = 'Max Rank Achieved!';
+            progressFill.style.width = '100%';
+            progressFill.style.background = 'linear-gradient(90deg, #8b5cf6, #ec4899)'; // prestige colors
+        } else {
+            const days = state.completedDaysThisWeek || 0;
+            progressText.textContent = `${days}/7 Days`;
+            const percentage = Math.min((days / 7) * 100, 100);
+            progressFill.style.width = `${percentage}%`;
+            progressFill.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))';
+        }
     }
 
     // Recalculate score from task earnings + side quests + manual adjustments
@@ -363,7 +374,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Reset daily tasks & side quests if a new day has started
     function checkDailyReset() {
         const todayStr = new Date().toDateString();
-        if (state.lastResetDate !== todayStr) {
+        const todayTime = new Date(todayStr).getTime();
+        const lastResetTime = state.lastResetDate ? new Date(state.lastResetDate).getTime() : 0;
+
+        if (todayTime > lastResetTime) {
             const previousScore = state.score || 0;
             
             // Check if all active main quest tasks were completed yesterday
