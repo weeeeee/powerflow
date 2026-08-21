@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AI" + "zaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
@@ -12,7 +12,9 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+const db = initializeFirestore(app, {
+    localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
+});
 
 document.addEventListener('DOMContentLoaded', () => {
     // Default initial tasks if none exist in localStorage
@@ -191,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize Application
     function init() {
         // Listen to Firestore for real-time state changes
-        onSnapshot(doc(db, "users", "defaultFamily"), (docSnap) => {
+        onSnapshot(doc(db, "users", "defaultFamily"), { includeMetadataChanges: true }, (docSnap) => {
             if (docSnap.exists()) {
                 const parsed = docSnap.data();
                 
@@ -231,7 +233,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Re-render UI with new state
-            checkDailyReset();
+            // Only execute a destructive daily reset if the data is confirmed fresh from the server
+            // to avoid overwriting recent server data with a stale local cache reset.
+            if (!docSnap.metadata.fromCache) {
+                checkDailyReset();
+            }
+            
             recalculateTotalScore();
             renderDate();
             renderScheduleTasks();
@@ -1590,8 +1597,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 } else {
                     dayDiv.addEventListener('click', () => {
-                        // Empty data modal
-                        openDayDetailModal(dateStr, { score: 0, rank: 'Novice', tasks: [], sideQuests: [], date: dateStr });
+                        // Empty data modal using current active tasks as uncompleted templates
+                        openDayDetailModal(dateStr, { 
+                            score: 0, 
+                            rank: state.currentRank || 'Novice', 
+                            tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})), 
+                            sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null})), 
+                            date: dateStr 
+                        });
                     });
                 }
             }
@@ -1702,9 +1715,10 @@ document.addEventListener('DOMContentLoaded', () => {
             item = data.tasks.find(t => t.id === id);
             if (item) {
                 if (isCompleted) {
+                    const taskTime = item.targetTime ? item.targetTime : `${new Date().getHours().toString().padStart(2, '0')}:${new Date().getMinutes().toString().padStart(2, '0')}`;
                     item.completed = true;
-                    item.completedAt = defaultTime;
-                    item.pointsEarned = calculatePoints(item, defaultTime);
+                    item.completedAt = taskTime;
+                    item.pointsEarned = calculatePoints(item, taskTime);
                     pointsChange = item.pointsEarned;
                 } else {
                     item.completed = false;
