@@ -83,12 +83,15 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     // Application State
+    let isStateStale = true;
+    let lastTick = Date.now();
     let state = {
         score: 0,
         weeklyScore: 0,
         allTimeScore: 0,
         currentRank: 'Novice',
         completedDaysThisWeek: 0,
+        cycleStartDate: new Date().toDateString(),
         parentPassword: '1234',
         isParentUnlocked: false,
         lastResetDate: new Date().toDateString(),
@@ -212,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof state.allTimeScore !== 'number') state.allTimeScore = 0;
                 if (!state.currentRank) state.currentRank = 'Novice';
                 if (typeof state.completedDaysThisWeek !== 'number') state.completedDaysThisWeek = 0;
+                if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate || new Date().toDateString();
             } else {
                 // Initial creation / migration from localStorage
                 const localState = localStorage.getItem('powerflow_state');
@@ -233,12 +237,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             
             // Re-render UI with new state
-            // Only execute a destructive daily reset if the data is confirmed fresh from the server
-            // to avoid overwriting recent server data with a stale local cache reset.
-            if (!docSnap.metadata.fromCache) {
-                checkDailyReset();
-            }
-            
+            isStateStale = false;
+            checkDailyReset();
+
             recalculateTotalScore();
             renderDate();
             renderScheduleTasks();
@@ -264,6 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
             allTimeScore: state.allTimeScore,
             currentRank: state.currentRank,
             completedDaysThisWeek: state.completedDaysThisWeek,
+            cycleStartDate: state.cycleStartDate,
             parentPassword: state.parentPassword,
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
@@ -296,8 +298,8 @@ document.addEventListener('DOMContentLoaded', () => {
             progressFill.style.background = 'linear-gradient(90deg, #8b5cf6, #ec4899)'; // prestige colors
         } else {
             const days = state.completedDaysThisWeek || 0;
-            progressText.textContent = `${days}/7 Days`;
-            const percentage = Math.min((days / 7) * 100, 100);
+            progressText.textContent = `${days}/5 Days`;
+            const percentage = Math.min((days / 5) * 100, 100);
             progressFill.style.width = `${percentage}%`;
             progressFill.style.background = 'linear-gradient(90deg, var(--accent-primary), var(--accent-secondary))';
         }
@@ -352,24 +354,16 @@ document.addEventListener('DOMContentLoaded', () => {
         };
     }
 
-    // Helper to check if two dates are in different weeks (using Monday as start of week)
-    function isDifferentWeek(date1, date2) {
+    // Helper to count whole days between two dates
+    function daysBetween(date1, date2) {
         const d1 = new Date(date1);
         const d2 = new Date(date2);
-        
+
         // Normalize to midnight
         d1.setHours(0,0,0,0);
         d2.setHours(0,0,0,0);
-        
-        const day1 = d1.getDay() === 0 ? 6 : d1.getDay() - 1;
-        const monday1 = new Date(d1);
-        monday1.setDate(d1.getDate() - day1);
-        
-        const day2 = d2.getDay() === 0 ? 6 : d2.getDay() - 1;
-        const monday2 = new Date(d2);
-        monday2.setDate(d2.getDate() - day2);
-        
-        return monday1.getTime() !== monday2.getTime();
+
+        return Math.round((d2.getTime() - d1.getTime()) / 86400000);
     }
 
     // Helper to get rank numeric value
@@ -399,15 +393,16 @@ document.addEventListener('DOMContentLoaded', () => {
             // Add previous day's score to all-time
             state.allTimeScore = (state.allTimeScore || 0) + previousScore;
             
-            // Check for new week
-            if (isDifferentWeek(state.lastResetDate, todayStr)) {
-                state.weeklyScore = 0; // Fresh week, it doesn't include yesterday
-                
+            // Check if the current 5-day cycle has elapsed
+            if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate;
+            if (daysBetween(state.cycleStartDate, todayStr) >= 5) {
+                state.weeklyScore = 0; // Fresh cycle, it doesn't include yesterday
+
                 // Level up if consistency was met
-                if (state.completedDaysThisWeek >= 7) {
+                if (state.completedDaysThisWeek >= 5) {
                     const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
                     state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
-                    
+
                     const now = new Date();
                     const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
                     state.adjustments.push({
@@ -419,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 }
                 state.completedDaysThisWeek = 0;
+                state.cycleStartDate = todayStr;
             } else {
                 state.weeklyScore = (state.weeklyScore || 0) + previousScore;
             }
@@ -432,6 +428,26 @@ document.addEventListener('DOMContentLoaded', () => {
                 tasks: JSON.parse(JSON.stringify(state.tasks)),
                 sideQuests: JSON.parse(JSON.stringify(state.sideQuests || []))
             };
+
+            // If more than one day elapsed since the last reset (e.g. the app wasn't
+            // opened), mark the in-between days explicitly instead of silently
+            // skipping them - real activity, if any, on those days was never tracked.
+            const skippedDays = daysBetween(state.lastResetDate, todayStr) - 1;
+            for (let i = 1; i <= skippedDays; i++) {
+                const skippedDate = new Date(state.lastResetDate);
+                skippedDate.setDate(skippedDate.getDate() + i);
+                const skippedDateStr = skippedDate.toDateString();
+                if (!state.history[skippedDateStr]) {
+                    state.history[skippedDateStr] = {
+                        date: skippedDateStr,
+                        score: 0,
+                        rank: state.currentRank,
+                        tasks: [],
+                        sideQuests: [],
+                        unrecorded: true
+                    };
+                }
+            }
 
             state.lastResetDate = todayStr;
             state.tasks.forEach(t => {
@@ -459,6 +475,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // Clock display
     function startLiveClock() {
         const updateClock = () => {
+            const nowTime = Date.now();
+            if (nowTime - lastTick > 60000) {
+                isStateStale = true; // Mark stale if computer likely slept
+            }
+            lastTick = nowTime;
+
             const now = new Date();
             let h = now.getHours();
             const m = now.getMinutes().toString().padStart(2, '0');
@@ -469,10 +491,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Check for date change while app is open
             if (state.lastResetDate && state.lastResetDate !== new Date().toDateString()) {
-                checkDailyReset();
-                renderScheduleTasks();
-                renderSideQuests();
-                renderParentPortal();
+                if (!isStateStale) {
+                    checkDailyReset();
+                    renderScheduleTasks();
+                    renderSideQuests();
+                    renderParentPortal();
+                }
             }
         };
         updateClock();
@@ -1581,29 +1605,44 @@ document.addEventListener('DOMContentLoaded', () => {
                 dayDiv.innerHTML = `<span class="day-num">${i}</span>`;
             } else {
                 const historyData = state.history && state.history[dateStr];
-                
+
                 dayDiv.innerHTML = `<span class="day-num">${i}</span>`;
-                if (historyData) {
+                if (historyData && historyData.unrecorded) {
+                    dayDiv.classList.add('unrecorded');
+                    dayDiv.innerHTML += `<span class="day-points">Not tracked</span>`;
+
+                    dayDiv.addEventListener('click', () => {
+                        // App wasn't opened this day, so nothing was actually recorded
+                        openDayDetailModal(dateStr, {
+                            score: 0,
+                            rank: state.currentRank || 'Novice',
+                            tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})),
+                            sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null})),
+                            date: dateStr,
+                            unrecorded: true
+                        });
+                    });
+                } else if (historyData) {
                     dayDiv.innerHTML += `<span class="day-points">${historyData.score} pts</span>`;
-                    
+
                     // Check if perfect day (all main quests completed)
                     const activeTasks = (historyData.tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= getRankValue(historyData.rank || 'Novice'));
                     if (activeTasks.length > 0 && activeTasks.every(t => t.completed)) {
                         dayDiv.classList.add('perfect-day');
                     }
-                    
+
                     dayDiv.addEventListener('click', () => {
                         openDayDetailModal(dateStr, historyData);
                     });
                 } else {
                     dayDiv.addEventListener('click', () => {
                         // Empty data modal using current active tasks as uncompleted templates
-                        openDayDetailModal(dateStr, { 
-                            score: 0, 
-                            rank: state.currentRank || 'Novice', 
-                            tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})), 
-                            sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null})), 
-                            date: dateStr 
+                        openDayDetailModal(dateStr, {
+                            score: 0,
+                            rank: state.currentRank || 'Novice',
+                            tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})),
+                            sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null})),
+                            date: dateStr
                         });
                     });
                 }

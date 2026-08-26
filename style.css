@@ -1220,6 +1220,17 @@ body {
     color: #10b981;
 }
 
+.calendar-day.unrecorded {
+    border-style: dashed;
+    opacity: 0.6;
+}
+
+.calendar-day.unrecorded .day-points {
+    color: var(--text-secondary, #94a3b8);
+    font-size: 0.65rem;
+    font-weight: 600;
+}
+
 /* Editable Historical Task Styles */
 .historical-task-card {
     display: flex;
