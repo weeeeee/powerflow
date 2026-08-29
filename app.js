@@ -216,6 +216,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!state.currentRank) state.currentRank = 'Novice';
                 if (typeof state.completedDaysThisWeek !== 'number') state.completedDaysThisWeek = 0;
                 if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate || new Date().toDateString();
+                backfillAllTasksCompleted(state.history);
             } else {
                 // Initial creation / migration from localStorage
                 const localState = localStorage.getItem('powerflow_state');
@@ -370,6 +371,19 @@ document.addEventListener('DOMContentLoaded', () => {
     function getRankValue(rank) {
         const ranks = { 'Novice': 1, 'Veteran': 2, 'Master': 3, 'Prestige': 4 };
         return ranks[rank] || 1;
+    }
+
+    // One-time migration for history entries recorded before allTasksCompleted was
+    // tracked, so a later edit diffs against their real prior state instead of
+    // assuming "not completed" and potentially double-crediting the streak.
+    function backfillAllTasksCompleted(history) {
+        if (!history) return;
+        Object.values(history).forEach(entry => {
+            if (typeof entry.allTasksCompleted === 'boolean' || entry.unrecorded) return;
+            const rankVal = getRankValue(entry.rank || 'Novice');
+            const activeTasks = (entry.tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal);
+            entry.allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+        });
     }
 
     // Promote rank and grant the bonus if the streak requirement was met.
