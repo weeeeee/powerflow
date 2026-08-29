@@ -386,6 +386,25 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // Count the consecutive run of fully-completed days ending at fromDateStr,
+    // walking backward through history. Any missed/unrecorded day stops the count,
+    // and it never looks earlier than cycleStartDate (an already-consumed streak,
+    // e.g. from a past rank-up, shouldn't keep inflating a later one).
+    function computeCurrentStreak(fromDateStr) {
+        let streak = 0;
+        const floor = state.cycleStartDate ? new Date(state.cycleStartDate).getTime() : 0;
+        let d = new Date(fromDateStr);
+        d.setHours(0, 0, 0, 0);
+
+        while (d.getTime() >= floor) {
+            const entry = state.history && state.history[d.toDateString()];
+            if (!entry || !entry.allTasksCompleted) break;
+            streak++;
+            d.setDate(d.getDate() - 1);
+        }
+        return streak;
+    }
+
     // Promote rank and grant the bonus if the streak requirement was met.
     // Shared by checkDailyReset() and retroactive edits to a past day's tasks.
     function applyRankUpIfEligible() {
@@ -413,31 +432,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (todayTime > lastResetTime) {
             const previousScore = state.score || 0;
-            
+
             // Check if all active main quest tasks were completed yesterday
             const currentRankVal = getRankValue(state.currentRank || 'Novice');
             const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
             const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
-            
-            if (allTasksCompleted) {
-                state.completedDaysThisWeek = (state.completedDaysThisWeek || 0) + 1;
-            }
 
             // Add previous day's score to all-time
             state.allTimeScore = (state.allTimeScore || 0) + previousScore;
-            
-            // Check if the current 5-day cycle has elapsed
-            if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate;
-            if (daysBetween(state.cycleStartDate, todayStr) >= 5) {
-                state.weeklyScore = 0; // Fresh cycle, it doesn't include yesterday
 
-                // Level up if consistency was met
-                applyRankUpIfEligible();
-                state.completedDaysThisWeek = 0;
-                state.cycleStartDate = todayStr;
-            } else {
-                state.weeklyScore = (state.weeklyScore || 0) + previousScore;
-            }
+            if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate;
 
             // Figure out which real calendar day the live task/score data actually
             // belongs to. If the tab stayed open (or ran stale cached JS) across a
@@ -485,6 +489,23 @@ document.addEventListener('DOMContentLoaded', () => {
                         unrecorded: true
                     };
                 }
+            }
+
+            // A true consecutive streak: any missed (or unrecorded) day breaks it
+            // immediately rather than just failing to add to a cumulative count.
+            state.completedDaysThisWeek = computeCurrentStreak(dataDate);
+
+            if (state.completedDaysThisWeek >= 5) {
+                applyRankUpIfEligible();
+                state.completedDaysThisWeek = 0;
+                state.weeklyScore = 0; // Fresh streak, it doesn't include yesterday
+                state.cycleStartDate = todayStr;
+            } else if (!allTasksCompleted) {
+                // Streak broken - start counting fresh from today
+                state.weeklyScore = 0;
+                state.cycleStartDate = todayStr;
+            } else {
+                state.weeklyScore = (state.weeklyScore || 0) + previousScore;
             }
 
             state.lastResetDate = todayStr;
@@ -1824,19 +1845,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         data.score = Math.max(0, oldScore + pointsChange);
 
-        // If editing a task flipped whether every main quest was completed that day,
-        // credit (or un-credit) it toward the current streak - editing a past day's
-        // tasks previously never touched the streak/rank progress at all.
-        if (type === 'task' && state.cycleStartDate && daysBetween(state.cycleStartDate, dateStr) >= 0 && daysBetween(dateStr, new Date().toDateString()) > 0) {
+        // If editing a task changed whether every main quest was completed that day,
+        // recompute the consecutive streak from history - editing a past day's tasks
+        // previously never touched the streak/rank progress at all. A full recompute
+        // (not a simple +1/-1) is needed because this is a true consecutive streak:
+        // changing one day can cascade into every day after it.
+        if (type === 'task' && dateStr !== new Date().toDateString()) {
             const dayRankVal = getRankValue(data.rank || 'Novice');
             const dayActiveTasks = data.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= dayRankVal);
-            const nowAllCompleted = dayActiveTasks.length > 0 && dayActiveTasks.every(t => t.completed);
-            const wasAllCompleted = !!data.allTasksCompleted;
+            data.allTasksCompleted = dayActiveTasks.length > 0 && dayActiveTasks.every(t => t.completed);
 
-            if (nowAllCompleted !== wasAllCompleted) {
-                state.completedDaysThisWeek = Math.max(0, (state.completedDaysThisWeek || 0) + (nowAllCompleted ? 1 : -1));
-                if (nowAllCompleted) applyRankUpIfEligible();
-                data.allTasksCompleted = nowAllCompleted;
+            const mostRecentClosedDay = new Date(state.lastResetDate);
+            mostRecentClosedDay.setDate(mostRecentClosedDay.getDate() - 1);
+            const newStreak = computeCurrentStreak(mostRecentClosedDay.toDateString());
+
+            if (newStreak !== (state.completedDaysThisWeek || 0)) {
+                state.completedDaysThisWeek = newStreak;
+                if (newStreak >= 5) {
+                    applyRankUpIfEligible();
+                    state.completedDaysThisWeek = 0;
+                    state.weeklyScore = 0;
+                    state.cycleStartDate = new Date().toDateString();
+                }
                 updateRankProgressDisplay();
             }
         }
