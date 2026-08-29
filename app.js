@@ -142,7 +142,20 @@ document.addEventListener('DOMContentLoaded', () => {
     const calendarMonthYear = document.getElementById('calendar-month-year');
     const calPrevMonthBtn = document.getElementById('cal-prev-month');
     const calNextMonthBtn = document.getElementById('cal-next-month');
-    
+
+    // DOM Elements - Monthly Report
+    const openReportBtn = document.getElementById('open-report-btn');
+    const reportModal = document.getElementById('report-modal');
+    const closeReportModalBtn = document.getElementById('close-report-modal');
+    const closeReportBtn = document.getElementById('close-report-btn');
+    const reportPrevMonthBtn = document.getElementById('report-prev-month');
+    const reportNextMonthBtn = document.getElementById('report-next-month');
+    const reportMonthYear = document.getElementById('report-month-year');
+    const reportSummaryGrid = document.getElementById('report-summary-grid');
+    const reportChartCanvas = document.getElementById('report-chart-canvas');
+    const reportTableBody = document.getElementById('report-table-body');
+    const downloadReportBtn = document.getElementById('download-report-btn');
+
     // DOM Elements - Historical Day Detail
     const dayDetailModal = document.getElementById('day-detail-modal');
     const closeDayDetailModalBtn = document.getElementById('close-day-detail-modal');
@@ -366,6 +379,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return Math.round((d2.getTime() - d1.getTime()) / 86400000);
     }
+
+    const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
     // Helper to get rank numeric value
     function getRankValue(rank) {
@@ -1612,6 +1627,13 @@ document.addEventListener('DOMContentLoaded', () => {
             openCalendarModal();
         });
 
+        // Monthly Report Event Listeners
+        openReportBtn.addEventListener('click', openReportModal);
+        closeReportModalBtn.addEventListener('click', closeReportModalWindow);
+        closeReportBtn.addEventListener('click', closeReportModalWindow);
+        reportPrevMonthBtn.addEventListener('click', () => changeReportMonth(-1));
+        reportNextMonthBtn.addEventListener('click', () => changeReportMonth(1));
+        downloadReportBtn.addEventListener('click', downloadReportPDF);
     }
 
     // --- Historical Calendar Logic ---
@@ -1635,8 +1657,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const year = currentCalendarDate.getFullYear();
         const month = currentCalendarDate.getMonth();
         
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        calendarMonthYear.textContent = `${monthNames[month]} ${year}`;
+        calendarMonthYear.textContent = `${MONTH_NAMES[month]} ${year}`;
         
         calendarGrid.innerHTML = '';
         
@@ -1931,6 +1952,266 @@ document.addEventListener('DOMContentLoaded', () => {
             renderParentPortal();
             if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
         }
+    }
+
+    // --- Monthly Report Logic ---
+    let currentReportDate = new Date();
+
+    function openReportModal() {
+        reportModal.classList.remove('hidden');
+        renderReport();
+    }
+
+    function closeReportModalWindow() {
+        reportModal.classList.add('hidden');
+    }
+
+    function changeReportMonth(direction) {
+        currentReportDate.setMonth(currentReportDate.getMonth() + direction);
+        renderReport();
+    }
+
+    const REPORT_STATUS_LABELS = {
+        perfect: 'Perfect Day',
+        partial: 'Partial',
+        missed: 'Missed',
+        'no-data': 'Not Tracked',
+        future: '—'
+    };
+
+    // Build the day-by-day breakdown and totals for a given month from state.history.
+    function getMonthlyReportData(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = dateObj.getMonth();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const todayStr = new Date().toDateString();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const days = [];
+        let totalScore = 0;
+        let totalTasksCompleted = 0;
+        let perfectDays = 0;
+        let daysWithData = 0;
+        let daysElapsed = 0;
+        let runningStreak = 0;
+        let longestStreak = 0;
+
+        for (let d = 1; d <= daysInMonth; d++) {
+            const dayDate = new Date(year, month, d);
+            dayDate.setHours(0, 0, 0, 0);
+            const dateStr = dayDate.toDateString();
+            const label = `${MONTH_NAMES[month].slice(0, 3)} ${d}`;
+
+            if (dayDate.getTime() > today.getTime()) {
+                days.push({ day: d, label, dateStr, status: 'future', score: 0, completedCount: 0, totalCount: 0 });
+                continue;
+            }
+            daysElapsed++;
+
+            let entry = state.history && state.history[dateStr];
+            if (dateStr === todayStr && (!entry || entry.unrecorded)) {
+                // Today may not be archived to history yet - use live progress so far
+                const rankVal = getRankValue(state.currentRank || 'Novice');
+                entry = {
+                    score: state.score || 0,
+                    tasks: state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal),
+                    rank: state.currentRank
+                };
+            }
+
+            let status, score, completedCount, totalCount;
+            if (entry && !entry.unrecorded && Array.isArray(entry.tasks) && entry.tasks.length > 0) {
+                const rankVal = getRankValue(entry.rank || 'Novice');
+                const activeTasks = entry.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal);
+                completedCount = activeTasks.filter(t => t.completed).length;
+                totalCount = activeTasks.length;
+                score = entry.score || 0;
+                status = (totalCount > 0 && completedCount === totalCount) ? 'perfect' : (completedCount > 0 ? 'partial' : 'missed');
+                daysWithData++;
+            } else {
+                status = 'no-data';
+                score = 0;
+                completedCount = 0;
+                totalCount = 0;
+            }
+
+            totalScore += score;
+            totalTasksCompleted += completedCount;
+            if (status === 'perfect') {
+                perfectDays++;
+                runningStreak++;
+                longestStreak = Math.max(longestStreak, runningStreak);
+            } else {
+                runningStreak = 0;
+            }
+
+            days.push({ day: d, label, dateStr, status, score, completedCount, totalCount });
+        }
+
+        const consistencyPercent = daysElapsed > 0 ? Math.round((perfectDays / daysElapsed) * 100) : 0;
+
+        return { year, month, days, totalScore, totalTasksCompleted, perfectDays, daysWithData, daysElapsed, longestStreak, consistencyPercent };
+    }
+
+    const REPORT_CHART_COLORS = {
+        perfect: '#10b981',
+        partial: '#f59e0b',
+        missed: '#ef4444',
+        'no-data': '#cbd5e1',
+        future: '#f1f5f9'
+    };
+
+    // Draws a white-background bar chart (so it looks the same in-app and in the
+    // exported PDF) of each day's score, color-coded by completion status.
+    function drawScoreChart(canvas, days) {
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width;
+        const H = canvas.height;
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, W, H);
+
+        const padding = { top: 16, right: 12, bottom: 26, left: 12 };
+        const chartW = W - padding.left - padding.right;
+        const chartH = H - padding.top - padding.bottom;
+        const maxScore = Math.max(10, ...days.map(d => d.score || 0));
+        const barGap = 4;
+        const barWidth = chartW / days.length - barGap;
+
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 4; i++) {
+            const gy = padding.top + (chartH / 4) * i;
+            ctx.beginPath();
+            ctx.moveTo(padding.left, gy);
+            ctx.lineTo(W - padding.right, gy);
+            ctx.stroke();
+        }
+
+        days.forEach((d, i) => {
+            const x = padding.left + i * (barWidth + barGap);
+            const barH = d.status === 'future' ? 0 : Math.max((d.score / maxScore) * chartH, d.score > 0 ? 2 : 0);
+            const y = padding.top + chartH - barH;
+            ctx.fillStyle = REPORT_CHART_COLORS[d.status] || '#cbd5e1';
+            ctx.fillRect(x, y, barWidth, barH);
+
+            ctx.fillStyle = '#64748b';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(String(d.day), x + barWidth / 2, H - 8);
+        });
+    }
+
+    function renderReport() {
+        reportMonthYear.textContent = `${MONTH_NAMES[currentReportDate.getMonth()]} ${currentReportDate.getFullYear()}`;
+        const data = getMonthlyReportData(currentReportDate);
+
+        const stats = [
+            [data.totalTasksCompleted, 'Tasks Completed'],
+            [data.totalScore, 'Score Earned'],
+            [data.perfectDays, 'Perfect Days'],
+            [`${data.longestStreak} day${data.longestStreak === 1 ? '' : 's'}`, 'Longest Streak'],
+            [`${data.consistencyPercent}%`, 'Consistency'],
+            [`${data.daysWithData}/${data.daysElapsed}`, 'Days Tracked']
+        ];
+        reportSummaryGrid.innerHTML = stats.map(([value, label]) => `
+            <div class="report-stat-card">
+                <span class="report-stat-value">${value}</span>
+                <span class="report-stat-label">${label}</span>
+            </div>
+        `).join('');
+
+        drawScoreChart(reportChartCanvas, data.days);
+
+        reportTableBody.innerHTML = data.days
+            .filter(d => d.status !== 'future')
+            .map(d => `
+                <tr>
+                    <td>${d.label}</td>
+                    <td>${d.totalCount > 0 ? `${d.completedCount}/${d.totalCount}` : '—'}</td>
+                    <td>${d.score}</td>
+                    <td><span class="report-status ${d.status}">${REPORT_STATUS_LABELS[d.status]}</span></td>
+                </tr>
+            `).join('');
+    }
+
+    function downloadReportPDF() {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            alert('The PDF library failed to load. Check your internet connection and try again.');
+            return;
+        }
+
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+        const data = getMonthlyReportData(currentReportDate);
+        const monthLabel = `${MONTH_NAMES[currentReportDate.getMonth()]} ${currentReportDate.getFullYear()}`;
+        const pageWidth = doc.internal.pageSize.getWidth();
+        const marginX = 40;
+        let y = 50;
+
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(18);
+        doc.text('PowerFlow Monthly Report', marginX, y);
+        y += 20;
+
+        doc.setFont(undefined, 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(90);
+        doc.text(`${monthLabel}  •  Generated ${new Date().toLocaleDateString()}`, marginX, y);
+        doc.setTextColor(0);
+        y += 30;
+
+        const stats = [
+            [data.totalTasksCompleted, 'Tasks Completed'],
+            [data.totalScore, 'Score Earned'],
+            [data.perfectDays, 'Perfect Days'],
+            [`${data.longestStreak} day${data.longestStreak === 1 ? '' : 's'}`, 'Longest Streak'],
+            [`${data.consistencyPercent}%`, 'Consistency'],
+            [`${data.daysWithData}/${data.daysElapsed}`, 'Days Tracked']
+        ];
+        const colWidth = (pageWidth - marginX * 2) / 3;
+        stats.forEach((pair, i) => {
+            const col = i % 3;
+            const row = Math.floor(i / 3);
+            const x = marginX + col * colWidth;
+            const py = y + row * 36;
+            doc.setFont(undefined, 'bold');
+            doc.setFontSize(15);
+            doc.text(String(pair[0]), x, py);
+            doc.setFont(undefined, 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor(100);
+            doc.text(pair[1].toUpperCase(), x, py + 13);
+            doc.setTextColor(0);
+        });
+        y += 36 * 2 + 15;
+
+        doc.setFont(undefined, 'bold');
+        doc.setFontSize(12);
+        doc.text('Daily Score', marginX, y);
+        y += 8;
+        const chartWidth = pageWidth - marginX * 2;
+        const chartHeight = chartWidth * (reportChartCanvas.height / reportChartCanvas.width);
+        doc.addImage(reportChartCanvas.toDataURL('image/png'), 'PNG', marginX, y, chartWidth, chartHeight);
+        y += chartHeight + 20;
+
+        doc.autoTable({
+            startY: y,
+            head: [['Date', 'Tasks', 'Score', 'Status']],
+            body: data.days.filter(d => d.status !== 'future').map(d => [
+                d.label,
+                d.totalCount > 0 ? `${d.completedCount}/${d.totalCount}` : '—',
+                d.score,
+                REPORT_STATUS_LABELS[d.status]
+            ]),
+            theme: 'striped',
+            headStyles: { fillColor: [67, 56, 202] },
+            margin: { left: marginX, right: marginX },
+            styles: { fontSize: 9 }
+        });
+
+        doc.save(`PowerFlow_Report_${monthLabel.replace(' ', '_')}.pdf`);
     }
 
     // Run Initialization

@@ -145,6 +145,7 @@
                 <button id="open-add-store-btn" class="btn-primary" style="background: linear-gradient(135deg, #8b5cf6, #3b82f6);">🛒 + Store Item</button>
                 <button id="open-adjust-points-btn" class="btn-accent">⚡ Adjust Points</button>
                 <button id="open-calendar-btn" class="btn-primary" style="background: linear-gradient(135deg, #14b8a6, #0f766e); width: 100%; margin-top: 0.5rem; font-size: 1rem; padding: 1rem;">📅 View History Calendar</button>
+                <button id="open-report-btn" class="btn-primary" style="background: linear-gradient(135deg, #6366f1, #4338ca); width: 100%; margin-top: 0.5rem; font-size: 1rem; padding: 1rem;">📈 Monthly Report</button>
             </div>
 
             <!-- Schedule Management Section -->
@@ -498,7 +499,56 @@
         </div>
     </div>
 
-    <script type="module" src="app.js?v=7"></script>
+    <!-- Modal: Monthly Report -->
+    <div id="report-modal" class="modal-overlay hidden">
+        <div class="modal-card glass-panel" style="max-width: 680px;">
+            <div class="modal-header">
+                <h3>Monthly Progress Report</h3>
+                <button class="close-modal-btn" id="close-report-modal">&times;</button>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+                <div class="calendar-controls">
+                    <button id="report-prev-month" class="btn-icon">⬅️</button>
+                    <h4 id="report-month-year">August 2026</h4>
+                    <button id="report-next-month" class="btn-icon">➡️</button>
+                </div>
+
+                <div class="report-summary-grid" id="report-summary-grid">
+                    <!-- Summary stat cards injected here -->
+                </div>
+
+                <h4 class="report-section-title">Daily Score</h4>
+                <div class="report-chart-container">
+                    <canvas id="report-chart-canvas" width="1200" height="300"></canvas>
+                </div>
+
+                <h4 class="report-section-title">Daily Breakdown</h4>
+                <div class="report-table-wrap">
+                    <table class="report-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Tasks</th>
+                                <th>Score</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="report-table-body">
+                            <!-- Daily rows injected here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="close-report-btn">Close</button>
+                <button type="button" class="btn-primary" id="download-report-btn">⬇️ Download PDF</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+    <script type="module" src="app.js?v=8"></script>
 </body>
 </html>
 
