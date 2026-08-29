@@ -372,6 +372,25 @@ document.addEventListener('DOMContentLoaded', () => {
         return ranks[rank] || 1;
     }
 
+    // Promote rank and grant the bonus if the streak requirement was met.
+    // Shared by checkDailyReset() and retroactive edits to a past day's tasks.
+    function applyRankUpIfEligible() {
+        if ((state.completedDaysThisWeek || 0) < 5 || state.currentRank === 'Prestige') return;
+
+        const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
+        state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
+
+        const now = new Date();
+        const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+        state.adjustments.push({
+            id: `adj-levelup-${Date.now()}`,
+            type: 'add',
+            amount: 200,
+            reason: 'Level Up Bonus!',
+            timestamp: timeStr
+        });
+    }
+
     // Reset daily tasks & side quests if a new day has started
     function checkDailyReset() {
         const todayStr = new Date().toDateString();
@@ -399,20 +418,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.weeklyScore = 0; // Fresh cycle, it doesn't include yesterday
 
                 // Level up if consistency was met
-                if (state.completedDaysThisWeek >= 5) {
-                    const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
-                    state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
-
-                    const now = new Date();
-                    const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-                    state.adjustments.push({
-                        id: `adj-levelup-${Date.now()}`,
-                        type: 'add',
-                        amount: 200,
-                        reason: 'Level Up Bonus!',
-                        timestamp: timeStr
-                    });
-                }
+                applyRankUpIfEligible();
                 state.completedDaysThisWeek = 0;
                 state.cycleStartDate = todayStr;
             } else {
@@ -442,7 +448,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 score: previousScore,
                 rank: state.currentRank,
                 tasks: JSON.parse(JSON.stringify(state.tasks)),
-                sideQuests: JSON.parse(JSON.stringify(state.sideQuests || []))
+                sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])),
+                allTasksCompleted
             };
 
             // Any other days in the gap (before or after the real data day) had no
@@ -1748,18 +1755,21 @@ document.addEventListener('DOMContentLoaded', () => {
     function toggleHistoricalTask(dateStr, id, type, isCompleted) {
         if (!state.history) state.history = {};
         
-        // If they click on a day that previously had no history, generate a dummy history based on current templates
-        if (!state.history[dateStr]) {
+        // If they click on a day that previously had no history (or only an empty
+        // "unrecorded" placeholder), generate a dummy history based on current templates
+        const existing = state.history[dateStr];
+        if (!existing || !Array.isArray(existing.tasks) || existing.tasks.length === 0) {
             state.history[dateStr] = {
                 date: dateStr,
                 score: 0,
-                rank: state.currentRank || 'Novice',
+                rank: (existing && existing.rank) || state.currentRank || 'Novice',
                 tasks: JSON.parse(JSON.stringify(state.tasks)).map(t => ({...t, completed: false, pointsEarned: 0, completedAt: null})),
                 sideQuests: JSON.parse(JSON.stringify(state.sideQuests || [])).map(q => ({...q, completed: false, completedAt: null}))
             };
         }
-        
+
         const data = state.history[dateStr];
+        delete data.unrecorded; // this day now has a real, edited record
         let oldScore = data.score || 0;
         let item = null;
         let pointsChange = 0;
@@ -1799,10 +1809,27 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         data.score = Math.max(0, oldScore + pointsChange);
-        
+
+        // If editing a task flipped whether every main quest was completed that day,
+        // credit (or un-credit) it toward the current streak - editing a past day's
+        // tasks previously never touched the streak/rank progress at all.
+        if (type === 'task' && state.cycleStartDate && daysBetween(state.cycleStartDate, dateStr) >= 0 && daysBetween(dateStr, new Date().toDateString()) > 0) {
+            const dayRankVal = getRankValue(data.rank || 'Novice');
+            const dayActiveTasks = data.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= dayRankVal);
+            const nowAllCompleted = dayActiveTasks.length > 0 && dayActiveTasks.every(t => t.completed);
+            const wasAllCompleted = !!data.allTasksCompleted;
+
+            if (nowAllCompleted !== wasAllCompleted) {
+                state.completedDaysThisWeek = Math.max(0, (state.completedDaysThisWeek || 0) + (nowAllCompleted ? 1 : -1));
+                if (nowAllCompleted) applyRankUpIfEligible();
+                data.allTasksCompleted = nowAllCompleted;
+                updateRankProgressDisplay();
+            }
+        }
+
         // Adjust allTimeScore and update today's state if we are editing today
         state.allTimeScore = Math.max(0, (state.allTimeScore || 0) + pointsChange);
-        
+
         if (dateStr === new Date().toDateString()) {
             if (type === 'task') {
                 const liveItem = state.tasks.find(t => t.id === id);
