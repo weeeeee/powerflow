@@ -419,24 +419,41 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.weeklyScore = (state.weeklyScore || 0) + previousScore;
             }
 
-            // Save final snapshot of yesterday before clearing
+            // Figure out which real calendar day the live task/score data actually
+            // belongs to. If the tab stayed open (or ran stale cached JS) across a
+            // midnight boundary without ever detecting the date change, lastResetDate
+            // can be stale while state.tasks reflects activity from a later day.
+            // lastModified (updated on every save) is a reliable stamp of when that
+            // activity actually happened, so prefer it - clamped to the open gap -
+            // over blindly trusting the stale lastResetDate.
+            let dataDate = state.lastResetDate;
+            if (state.lastModified) {
+                const modifiedDateStr = new Date(state.lastModified).toDateString();
+                const modifiedTime = new Date(modifiedDateStr).getTime();
+                if (modifiedTime > lastResetTime && modifiedTime < todayTime) {
+                    dataDate = modifiedDateStr;
+                }
+            }
+
+            // Save final snapshot for the day the data actually belongs to
             if (!state.history) state.history = {};
-            state.history[state.lastResetDate] = {
-                date: state.lastResetDate,
+            state.history[dataDate] = {
+                date: dataDate,
                 score: previousScore,
                 rank: state.currentRank,
                 tasks: JSON.parse(JSON.stringify(state.tasks)),
                 sideQuests: JSON.parse(JSON.stringify(state.sideQuests || []))
             };
 
-            // If more than one day elapsed since the last reset (e.g. the app wasn't
-            // opened), mark the in-between days explicitly instead of silently
-            // skipping them - real activity, if any, on those days was never tracked.
+            // Any other days in the gap (before or after the real data day) had no
+            // tracked activity at all - mark them explicitly instead of silently
+            // skipping them.
             const skippedDays = daysBetween(state.lastResetDate, todayStr) - 1;
             for (let i = 1; i <= skippedDays; i++) {
                 const skippedDate = new Date(state.lastResetDate);
                 skippedDate.setDate(skippedDate.getDate() + i);
                 const skippedDateStr = skippedDate.toDateString();
+                if (skippedDateStr === dataDate) continue;
                 if (!state.history[skippedDateStr]) {
                     state.history[skippedDateStr] = {
                         date: skippedDateStr,
