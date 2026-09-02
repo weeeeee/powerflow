@@ -94,6 +94,11 @@ document.addEventListener('DOMContentLoaded', () => {
         { id: 'store-3', title: 'DoorDash Delivery', points: 200, icon: '🍔' }
     ];
 
+    // How long the tab/page can go without a clock tick before we treat it as
+    // having been suspended (device sleep, or - notably - an iOS home-screen
+    // web app backgrounded and later resumed) rather than just briefly idle.
+    const STALE_GAP_MS = 60000;
+
     // Application State
     let isStateStale = true;
     let lastTick = Date.now();
@@ -280,6 +285,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
         startLiveClock();
         setupEventListeners();
+
+        // While the page is hidden (backgrounded), the clock interval is throttled
+        // or fully suspended by the browser/OS - this is especially aggressive for
+        // an iOS home-screen web app, which iOS keeps alive rather than closing, so
+        // reopening it just resumes the same page with a now-dead Firestore
+        // connection instead of a fresh load. Detect a real suspension gap (not
+        // just a brief tab-switch) on resume and force a full reload so the app
+        // reconnects and syncs, rather than silently sitting on stale data.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible' && (Date.now() - lastTick > STALE_GAP_MS)) {
+                location.reload();
+            }
+        });
     }
 
     // Save state to Firestore
@@ -562,7 +580,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function startLiveClock() {
         const updateClock = () => {
             const nowTime = Date.now();
-            if (nowTime - lastTick > 60000) {
+            if (nowTime - lastTick > STALE_GAP_MS) {
                 isStateStale = true; // Mark stale if computer likely slept
             }
             lastTick = nowTime;
