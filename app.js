@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, getDocFromServer } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AI" + "zaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
@@ -225,13 +225,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialize Application
     function init() {
+        function renderEverything() {
+            recalculateTotalScore();
+            renderDate();
+            renderScheduleTasks();
+            renderSideQuests();
+            renderStore();
+            renderParentPortal();
+            if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
+            updateRankProgressDisplay();
+        }
+
         // Listen to Firestore for real-time state changes
         onSnapshot(doc(db, "users", "defaultFamily"), { includeMetadataChanges: true }, (docSnap) => {
+            const cameFromCache = docSnap.exists() && docSnap.metadata.fromCache;
+
             if (docSnap.exists()) {
                 const parsed = docSnap.data();
-                
+
                 state = { ...state, ...parsed };
-                
+
                 // Backup to localStorage
                 localStorage.setItem('powerflow_state', JSON.stringify(state));
                 // Ensure arrays exist
@@ -266,19 +279,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 saveState(); // push initial state to firestore
             }
-            
-            // Re-render UI with new state
-            isStateStale = false;
-            checkDailyReset();
 
-            recalculateTotalScore();
-            renderDate();
-            renderScheduleTasks();
-            renderSideQuests();
-            renderStore();
-            renderParentPortal();
-            if (typeof updateScoreDisplays === 'function') updateScoreDisplays();
-            updateRankProgressDisplay();
+            isStateStale = false;
+
+            if (cameFromCache) {
+                // This snapshot may be stale - served from the local offline cache
+                // before a fresh server read has completed (common right after a
+                // reload/reconnect). Render it for responsiveness, but NEVER run
+                // the destructive daily reset against data we can't yet confirm is
+                // current: a reset computed from a stale "yesterday" followed by
+                // this app's full-document save can silently wipe real progress
+                // made on another device in the meantime. Fetch a guaranteed-fresh
+                // copy directly from the server first and only then evaluate it.
+                renderEverything();
+                getDocFromServer(doc(db, "users", "defaultFamily")).then(freshSnap => {
+                    if (freshSnap.exists()) {
+                        state = { ...state, ...freshSnap.data() };
+                    }
+                    checkDailyReset();
+                    renderEverything();
+                }).catch(err => {
+                    console.error("Could not confirm fresh state before daily reset check:", err);
+                });
+                return;
+            }
+
+            checkDailyReset();
+            renderEverything();
         }, (error) => {
             console.error("Firebase listen error:", error);
         });
