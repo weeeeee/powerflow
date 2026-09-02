@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AI" + "zaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
@@ -12,9 +12,21 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const db = initializeFirestore(app, {
-    localCache: persistentLocalCache({tabManager: persistentMultipleTabManager()})
-});
+
+// Multi-tab IndexedDB persistence isn't reliably supported on every browser
+// (notably Safari/WebKit - i.e. every browser on iOS). If it throws here, this
+// whole module fails to load and the app never syncs at all, with no visible
+// error. Fall back to a plain (network-only, no offline cache) connection so
+// the app still works everywhere, just without offline persistence there.
+let db;
+try {
+    db = initializeFirestore(app, {
+        localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+    });
+} catch (e) {
+    console.error("Persistent multi-tab Firestore cache unavailable, falling back to network-only mode:", e);
+    db = getFirestore(app);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
     // Default initial tasks if none exist in localStorage
