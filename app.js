@@ -297,6 +297,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         state = { ...state, ...freshSnap.data() };
                     }
                     checkDailyReset();
+                    if (reconcileStreak()) saveState();
                     renderEverything();
                 }).catch(err => {
                     console.error("Could not confirm fresh state before daily reset check:", err);
@@ -305,6 +306,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             checkDailyReset();
+            if (reconcileStreak()) saveState();
             renderEverything();
         }, (error) => {
             console.error("Firebase listen error:", error);
@@ -475,6 +477,41 @@ document.addEventListener('DOMContentLoaded', () => {
             d.setDate(d.getDate() - 1);
         }
         return streak;
+    }
+
+    // Recomputes the streak from history and persists a correction if it
+    // changed. Also un-sticks a premature reset: if the day(s) immediately
+    // before the current cycle start turn out to be fully complete after all
+    // (a late task checked off, or a day corrected after the fact), the reset
+    // that created that cycle start was wrong - walk the floor back through
+    // that now-complete run before recomputing, so the credit isn't silently
+    // swallowed by a floor that's stuck in the past.
+    function reconcileStreak() {
+        if (!state.cycleStartDate || !state.lastResetDate) return false;
+
+        let d = new Date(state.cycleStartDate);
+        d.setDate(d.getDate() - 1);
+        while (true) {
+            const entry = state.history && state.history[d.toDateString()];
+            if (!entry || !entry.allTasksCompleted) break;
+            state.cycleStartDate = d.toDateString();
+            d.setDate(d.getDate() - 1);
+        }
+
+        const mostRecentClosedDay = new Date(state.lastResetDate);
+        mostRecentClosedDay.setDate(mostRecentClosedDay.getDate() - 1);
+        const newStreak = computeCurrentStreak(mostRecentClosedDay.toDateString());
+
+        if (newStreak === (state.completedDaysThisWeek || 0)) return false;
+
+        state.completedDaysThisWeek = newStreak;
+        if (newStreak >= 5) {
+            applyRankUpIfEligible();
+            state.completedDaysThisWeek = 0;
+            state.weeklyScore = 0;
+            state.cycleStartDate = new Date().toDateString();
+        }
+        return true;
     }
 
     // Promote rank and grant the bonus if the streak requirement was met.
@@ -1933,20 +1970,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const dayActiveTasks = data.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= dayRankVal);
             data.allTasksCompleted = dayActiveTasks.length > 0 && dayActiveTasks.every(t => t.completed);
 
-            const mostRecentClosedDay = new Date(state.lastResetDate);
-            mostRecentClosedDay.setDate(mostRecentClosedDay.getDate() - 1);
-            const newStreak = computeCurrentStreak(mostRecentClosedDay.toDateString());
-
-            if (newStreak !== (state.completedDaysThisWeek || 0)) {
-                state.completedDaysThisWeek = newStreak;
-                if (newStreak >= 5) {
-                    applyRankUpIfEligible();
-                    state.completedDaysThisWeek = 0;
-                    state.weeklyScore = 0;
-                    state.cycleStartDate = new Date().toDateString();
-                }
-                updateRankProgressDisplay();
-            }
+            if (reconcileStreak()) updateRankProgressDisplay();
         }
 
         // Adjust allTimeScore and update today's state if we are editing today
