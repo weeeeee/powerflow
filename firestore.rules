@@ -1,0 +1,22 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // PowerFlow has no login system - the parent portal is gated only by a
+    // client-side PIN stored inside this same document, not by Firebase Auth.
+    // These rules can't distinguish "the family" from anyone else who has the
+    // app's Firebase config (which is inherently public in the deployed JS,
+    // same as any Firebase web app). What they DO enforce: access is scoped
+    // to exactly this one document - test mode's `/{document=**}` wildcard
+    // otherwise leaves every collection in the project wide open - and there
+    // is no expiration, so the app won't silently break in 30 days the way
+    // test mode does.
+    match /users/defaultFamily {
+      allow read, write: if true;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
