@@ -264,6 +264,16 @@
                 </div>
 
                 <div class="input-group">
+                    <label for="event-days-select">Which Days:</label>
+                    <select id="event-days-select" class="custom-select">
+                        <option value="everyday">Every Day</option>
+                        <option value="weekdays">Weekdays Only (Mon-Fri)</option>
+                        <option value="weekends">Weekends Only (Sat-Sun)</option>
+                    </select>
+                    <span class="hint-text">On days it's not scheduled, this step won't appear and won't be required for a perfect day.</span>
+                </div>
+
+                <div class="input-group">
                     <label for="event-penalty-input">Penalty per Hour Late (Points lost/hr):</label>
                     <input type="number" id="event-penalty-input" min="0" max="100" value="1">
                     <span class="hint-text">Deducted from base points if completed after target time.</span>
@@ -548,7 +558,7 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
-    <script type="module" src="app.js?v=12"></script>
+    <script type="module" src="app.js?v=13"></script>
 </body>
 </html>
 

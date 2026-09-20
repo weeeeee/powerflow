@@ -447,6 +447,42 @@ document.addEventListener('DOMContentLoaded', () => {
         return ranks[rank] || 1;
     }
 
+    // A task is only "active" (counts toward the day's checklist and toward
+    // whether the day was a perfect day) on the days it's scheduled for.
+    // Undefined/'everyday' means no restriction, for backward compatibility
+    // with tasks created before this field existed.
+    function isTaskActiveOnDay(task, dayOfWeek) {
+        if (task.activeDays === 'weekdays') return dayOfWeek >= 1 && dayOfWeek <= 5;
+        if (task.activeDays === 'weekends') return dayOfWeek === 0 || dayOfWeek === 6;
+        return true;
+    }
+
+    // Tasks that meet the rank requirement, regardless of day-of-week - used
+    // only to tell "no main quests configured at all" apart from "nothing was
+    // scheduled today," since those must NOT be treated the same for streak
+    // purposes (see isDayFullyCompleted).
+    function getRankTasks(tasks, rank) {
+        const rankVal = getRankValue(rank || 'Novice');
+        return (tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal);
+    }
+
+    // Tasks that both meet the rank requirement and are scheduled for the
+    // given date - the actual "required today" checklist for that day.
+    function getActiveTasksForDay(tasks, rank, dateOrDateStr) {
+        const dayOfWeek = new Date(dateOrDateStr).getDay();
+        return getRankTasks(tasks, rank).filter(t => isTaskActiveOnDay(t, dayOfWeek));
+    }
+
+    // A day counts as fully completed if every task actually required that day
+    // is done. A day with no main quests configured at all does NOT count (there
+    // must be a real checklist) - but a day where a checklist exists and simply
+    // nothing on it was scheduled (e.g. a weekday-only task on a weekend) counts
+    // as vacuously complete, so it can't accidentally break the streak.
+    function isDayFullyCompleted(tasks, rank, dateOrDateStr) {
+        if (getRankTasks(tasks, rank).length === 0) return false;
+        return getActiveTasksForDay(tasks, rank, dateOrDateStr).every(t => t.completed);
+    }
+
     // One-time migration for history entries recorded before allTasksCompleted was
     // tracked, so a later edit diffs against their real prior state instead of
     // assuming "not completed" and potentially double-crediting the streak.
@@ -454,9 +490,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!history) return;
         Object.values(history).forEach(entry => {
             if (typeof entry.allTasksCompleted === 'boolean' || entry.unrecorded) return;
-            const rankVal = getRankValue(entry.rank || 'Novice');
-            const activeTasks = (entry.tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal);
-            entry.allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
+            entry.allTasksCompleted = isDayFullyCompleted(entry.tasks, entry.rank, entry.date);
         });
     }
 
@@ -542,16 +576,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (todayTime > lastResetTime) {
             const previousScore = state.score || 0;
 
-            // Check if all active main quest tasks were completed yesterday
-            const currentRankVal = getRankValue(state.currentRank || 'Novice');
-            const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
-            const allTasksCompleted = activeTasks.length > 0 && activeTasks.every(t => t.completed);
-
-            // Add previous day's score to all-time
-            state.allTimeScore = (state.allTimeScore || 0) + previousScore;
-
-            if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate;
-
             // Figure out which real calendar day the live task/score data actually
             // belongs to. If the tab stayed open (or ran stale cached JS) across a
             // midnight boundary without ever detecting the date change, lastResetDate
@@ -567,6 +591,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     dataDate = modifiedDateStr;
                 }
             }
+
+            // Check if all active main quest tasks were completed on that day
+            // (a task scheduled only for weekdays/weekends doesn't count against
+            // the streak on a day it isn't required).
+            const allTasksCompleted = isDayFullyCompleted(state.tasks, state.currentRank, dataDate);
+
+            // Add previous day's score to all-time
+            state.allTimeScore = (state.allTimeScore || 0) + previousScore;
+
+            if (!state.cycleStartDate) state.cycleStartDate = state.lastResetDate;
 
             // Save final snapshot for the day the data actually belongs to
             if (!state.history) state.history = {};
@@ -741,8 +775,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderScheduleTasks() {
         taskListEl.innerHTML = '';
         
-        const currentRankVal = getRankValue(state.currentRank || 'Novice');
-        const activeTasks = state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= currentRankVal);
+        const activeTasks = getActiveTasksForDay(state.tasks, state.currentRank, new Date());
 
         kidTaskCountEl.textContent = `${activeTasks.length} Step${activeTasks.length !== 1 ? 's' : ''}`;
 
@@ -975,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const timeDisplay = task.targetTime ? formatTime(task.targetTime) : 'Anytime';
             const penaltyDisplay = task.penaltyPerHour > 0 ? `-${task.penaltyPerHour} pts/hr late` : 'No penalty';
+            const daysDisplay = task.activeDays === 'weekdays' ? '📅 Weekdays Only' : (task.activeDays === 'weekends' ? '📅 Weekends Only' : null);
 
             card.innerHTML = `
                 <div class="parent-event-info">
@@ -984,6 +1018,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <span class="event-tag">${task.basePoints} pts</span>
                         <span class="event-tag">⏰ ${timeDisplay}</span>
                         <span class="event-tag">${penaltyDisplay}</span>
+                        ${daysDisplay ? `<span class="event-tag">${daysDisplay}</span>` : ''}
                         ${task.completed ? '<span class="badge badge-success">Completed Today</span>' : ''}
                     </div>
                 </div>
@@ -1326,6 +1361,8 @@ document.addEventListener('DOMContentLoaded', () => {
         eventPenaltyInput.value = '1';
         const rankSelect = document.getElementById('event-rank-select');
         if (rankSelect) rankSelect.value = 'Novice';
+        const daysSelect = document.getElementById('event-days-select');
+        if (daysSelect) daysSelect.value = 'everyday';
         eventModal.classList.remove('hidden');
         setTimeout(() => eventTitleInput.focus(), 100);
     }
@@ -1339,6 +1376,8 @@ document.addEventListener('DOMContentLoaded', () => {
         eventPenaltyInput.value = task.penaltyPerHour;
         const rankSelect = document.getElementById('event-rank-select');
         if (rankSelect) rankSelect.value = task.levelRequired || 'Novice';
+        const daysSelect = document.getElementById('event-days-select');
+        if (daysSelect) daysSelect.value = task.activeDays || 'everyday';
         eventModal.classList.remove('hidden');
         setTimeout(() => eventTitleInput.focus(), 100);
     }
@@ -1534,6 +1573,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const penaltyPerHour = parseInt(eventPenaltyInput.value, 10) || 0;
             const rankSelect = document.getElementById('event-rank-select');
             const levelRequired = rankSelect ? rankSelect.value : 'Novice';
+            const daysSelect = document.getElementById('event-days-select');
+            const activeDays = daysSelect ? daysSelect.value : 'everyday';
 
             if (!title) return;
 
@@ -1546,6 +1587,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     task.targetTime = targetTime;
                     task.penaltyPerHour = penaltyPerHour;
                     task.levelRequired = levelRequired;
+                    task.activeDays = activeDays;
                 }
             } else {
                 // Add new task
@@ -1556,6 +1598,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     targetTime,
                     penaltyPerHour,
                     levelRequired,
+                    activeDays,
                     completed: false,
                     pointsEarned: 0,
                     completedAt: null
@@ -1800,8 +1843,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     dayDiv.innerHTML += `<span class="day-points">${historyData.score} pts</span>`;
 
                     // Check if perfect day (all main quests completed)
-                    const activeTasks = (historyData.tasks || []).filter(t => getRankValue(t.levelRequired || 'Novice') <= getRankValue(historyData.rank || 'Novice'));
-                    if (activeTasks.length > 0 && activeTasks.every(t => t.completed)) {
+                    if (isDayFullyCompleted(historyData.tasks, historyData.rank, dateStr)) {
                         dayDiv.classList.add('perfect-day');
                     }
 
@@ -1966,9 +2008,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // (not a simple +1/-1) is needed because this is a true consecutive streak:
         // changing one day can cascade into every day after it.
         if (type === 'task' && dateStr !== new Date().toDateString()) {
-            const dayRankVal = getRankValue(data.rank || 'Novice');
-            const dayActiveTasks = data.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= dayRankVal);
-            data.allTasksCompleted = dayActiveTasks.length > 0 && dayActiveTasks.every(t => t.completed);
+            data.allTasksCompleted = isDayFullyCompleted(data.tasks, data.rank, dateStr);
 
             if (reconcileStreak()) updateRankProgressDisplay();
         }
@@ -2093,22 +2133,20 @@ document.addEventListener('DOMContentLoaded', () => {
             let entry = state.history && state.history[dateStr];
             if (dateStr === todayStr && (!entry || entry.unrecorded)) {
                 // Today may not be archived to history yet - use live progress so far
-                const rankVal = getRankValue(state.currentRank || 'Novice');
                 entry = {
                     score: state.score || 0,
-                    tasks: state.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal),
+                    tasks: state.tasks,
                     rank: state.currentRank
                 };
             }
 
             let status, score, completedCount, totalCount;
             if (entry && !entry.unrecorded && Array.isArray(entry.tasks) && entry.tasks.length > 0) {
-                const rankVal = getRankValue(entry.rank || 'Novice');
-                const activeTasks = entry.tasks.filter(t => getRankValue(t.levelRequired || 'Novice') <= rankVal);
+                const activeTasks = getActiveTasksForDay(entry.tasks, entry.rank, dateStr);
                 completedCount = activeTasks.filter(t => t.completed).length;
                 totalCount = activeTasks.length;
                 score = entry.score || 0;
-                status = (totalCount > 0 && completedCount === totalCount) ? 'perfect' : (completedCount > 0 ? 'partial' : 'missed');
+                status = isDayFullyCompleted(entry.tasks, entry.rank, dateStr) ? 'perfect' : (completedCount > 0 ? 'partial' : 'missed');
                 daysWithData++;
             } else {
                 status = 'no-data';
