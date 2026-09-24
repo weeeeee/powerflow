@@ -339,6 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
             currentRank: state.currentRank,
             completedDaysThisWeek: state.completedDaysThisWeek,
             cycleStartDate: state.cycleStartDate,
+            rankUpFloorDate: state.rankUpFloorDate || null,
             parentPassword: state.parentPassword,
             lastResetDate: state.lastResetDate,
             tasks: state.tasks,
@@ -523,9 +524,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function reconcileStreak() {
         if (!state.cycleStartDate || !state.lastResetDate) return false;
 
+        // Days at or before a rank-up were already rewarded; never walk back into
+        // them, or the same run of perfect days would trigger another promotion.
+        const rewardedFloor = state.rankUpFloorDate ? new Date(state.rankUpFloorDate).getTime() : 0;
+
         let d = new Date(state.cycleStartDate);
         d.setDate(d.getDate() - 1);
-        while (true) {
+        while (d.getTime() >= rewardedFloor) {
             const entry = state.history && state.history[d.toDateString()];
             if (!entry || !entry.allTasksCompleted) break;
             state.cycleStartDate = d.toDateString();
@@ -555,6 +560,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const nextRank = { 'Novice': 'Veteran', 'Veteran': 'Master', 'Master': 'Prestige', 'Prestige': 'Prestige' };
         state.currentRank = nextRank[state.currentRank || 'Novice'] || 'Veteran';
+        state.rankUpFloorDate = new Date().toDateString();
 
         const now = new Date();
         const timeStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
