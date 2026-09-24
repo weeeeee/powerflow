@@ -12,7 +12,10 @@ service cloud.firestore {
     // is no expiration, so the app won't silently break in 30 days the way
     // test mode does.
     match /users/defaultFamily {
-      allow read, write: if true;
+      allow read: if true;
+      // Older cached copies of the app overwrite the whole record with stale
+      // data; only versions that stamp clientVersion >= 15 may save.
+      allow write: if request.resource.data.clientVersion >= 15;
     }
 
     match /{document=**} {

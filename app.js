@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
-import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, getDocFromServer } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import { doc, setDoc, onSnapshot, initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, getDocFromServer, runTransaction } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const firebaseConfig = {
   apiKey: "AI" + "zaSyAkUjpBHzVgb2UyCiIeaAGIj_A-vBz3YH0",
@@ -100,7 +100,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const STALE_GAP_MS = 60000;
 
     // Application State
+    // Bump in step with app.js?v= in index.html; firestore.rules rejects saves from older versions.
+    const CLIENT_VERSION = 15;
     let isStateStale = true;
+    // lastModified of the newest server copy this device has actually received.
+    // A save is refused if the server has moved past it (see saveState).
+    let lastSyncedModified = 0;
     let lastTick = Date.now();
     let state = {
         score: 0,
@@ -244,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const parsed = docSnap.data();
 
                 state = { ...state, ...parsed };
+                if (!docSnap.metadata.fromCache || !lastSyncedModified) lastSyncedModified = Math.max(lastSyncedModified, parsed.lastModified || 0);
 
                 // Backup to localStorage
                 localStorage.setItem('powerflow_state', JSON.stringify(state));
@@ -295,6 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 getDocFromServer(doc(db, "users", "defaultFamily")).then(freshSnap => {
                     if (freshSnap.exists()) {
                         state = { ...state, ...freshSnap.data() };
+                        lastSyncedModified = Math.max(lastSyncedModified, freshSnap.data().lastModified || 0);
                     }
                     checkDailyReset();
                     if (reconcileStreak()) saveState();
@@ -347,13 +354,32 @@ document.addEventListener('DOMContentLoaded', () => {
             storeItems: state.storeItems,
             adjustments: state.adjustments,
             history: state.history || {},
-            lastModified: state.lastModified
+            lastModified: state.lastModified,
+            clientVersion: CLIENT_VERSION
         };
         
-        setDoc(doc(db, "users", "defaultFamily"), stateToSave).catch(err => {
+        // Never blindly overwrite: a stale open page (e.g. a phone that was in the
+        // background with old data) saving its whole copy would wipe newer changes
+        // from other devices. Commit only if the server hasn't moved past the
+        // version this device last received; otherwise reload to the latest.
+        const ref = doc(db, "users", "defaultFamily");
+        runTransaction(db, async (tx) => {
+            const snap = await tx.get(ref);
+            const serverModified = snap.exists() ? (snap.data().lastModified || 0) : 0;
+            if (serverModified > lastSyncedModified) return 'conflict';
+            tx.set(ref, stateToSave);
+            return 'saved';
+        }).then(result => {
+            if (result === 'saved') {
+                lastSyncedModified = stateToSave.lastModified;
+            } else {
+                alert('This device had older data than another device, so your last change was not saved (this protects the newer data). The app will refresh to the latest - please redo it.');
+                location.reload();
+            }
+        }).catch(err => {
             console.error("Error saving state to Firestore:", err);
         });
-        
+
         // Also backup to local storage just in case
         localStorage.setItem('powerflow_state', JSON.stringify(stateToSave));
     }
